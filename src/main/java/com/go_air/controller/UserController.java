@@ -5,6 +5,7 @@ import com.go_air.entity.Flights;
 import com.go_air.entity.User;
 import com.go_air.enums.BookingType;
 import com.go_air.enums.DepartureType;
+import com.go_air.enums.TripType;
 import com.go_air.model.dtos.BookingResponseDTO;
 import com.go_air.model.dtos.PassengerTicketDTO;
 import com.go_air.service.UserService;
@@ -12,6 +13,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.*;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 
 @RestController
 @RequestMapping("/user")
@@ -19,6 +22,61 @@ public class UserController {
 
     @Autowired
     private UserService userService;
+    
+    @GetMapping("/flights/search")
+    public ResponseEntity<?> searchFlights(
+            @RequestParam TripType tripType,
+            @RequestParam(required = false) String airline,
+            @RequestParam String sourceAirports,       // comma-separated
+            @RequestParam String destinationAirports,  // comma-separated
+            @RequestParam(required = false) Integer stop,
+            @RequestParam(required = false) BookingType bookingType,
+            @RequestParam(required = false) DepartureType departureType,
+            @RequestParam(required = false) Double minPrice,
+            @RequestParam(required = false) Double maxPrice,
+            @RequestParam(required = false) Integer passengers,
+            @RequestParam String departureDates          // comma-separated
+    ) {
+        // Convert comma-separated strings to lists
+        List<String> sources = Arrays.stream(sourceAirports.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
+
+        List<String> destinations = Arrays.stream(destinationAirports.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
+
+        // Parse dates with a formatter that handles single-digit day/month
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-M-d");
+        List<LocalDate> dates = Arrays.stream(departureDates.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .map(s -> LocalDate.parse(s, formatter))
+                .toList();
+
+        // Clean airline parameter
+        airline = (airline != null && !airline.trim().isEmpty()) ? airline.trim() : null;
+
+        // Call service
+        List<List<Flights>> flights = userService.searchFlightsByTripType(
+                tripType,
+                airline,
+                sources,
+                destinations,
+                dates,
+                stop,
+                bookingType,
+                departureType,
+                minPrice,
+                maxPrice,
+                passengers
+        );
+
+        return ResponseEntity.ok(flights);
+    }
+
     
     // Search Flight
     @GetMapping("/flights")

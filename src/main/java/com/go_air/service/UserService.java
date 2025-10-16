@@ -7,6 +7,7 @@ import com.go_air.entity.User;
 import com.go_air.enums.BookingStatus;
 import com.go_air.enums.BookingType;
 import com.go_air.enums.DepartureType;
+import com.go_air.enums.TripType;
 import com.go_air.model.dtos.BookingResponseDTO;
 import com.go_air.model.dtos.PassengerResponseDTO;
 import com.go_air.model.dtos.PassengerTicketDTO;
@@ -46,6 +47,92 @@ public class UserService {
     private AdminService adminService; // fetch flight info
 
     
+    public List<List<Flights>> searchFlightsByTripType(
+        TripType tripType,
+        String airline,
+        List<String> sourceAirports,
+        List<String> destinationAirports,
+        List<LocalDate> departureDates,
+        Integer stop,
+        BookingType bookingType,
+        DepartureType departureType,
+        Double minPrice,
+        Double maxPrice,
+        Integer passengers
+       ) {
+       List<List<Flights>> result = new ArrayList<>();
+
+       if (sourceAirports == null || destinationAirports == null || sourceAirports.isEmpty() || destinationAirports.isEmpty()) {
+           throw new IllegalArgumentException("Source and destination airports must not be empty for the selected trip type.");
+       }
+
+       switch (tripType) {
+        case ONE_WAY -> result.add(getFlightsByFilters(
+                airline,
+                sourceAirports.get(0).trim(),
+                destinationAirports.get(0).trim(),
+                stop,
+                bookingType,
+                departureType,
+                minPrice,
+                maxPrice,
+                passengers
+        ));
+
+        case ROUND_TRIP -> {
+            // Going flight
+            result.add(getFlightsByFilters(
+                    airline,
+                    sourceAirports.get(0).trim(),
+                    destinationAirports.get(0).trim(),
+                    stop,
+                    bookingType,
+                    departureType,
+                    minPrice,
+                    maxPrice,
+                    passengers
+            ));
+            // Return flight
+            result.add(getFlightsByFilters(
+                    airline,
+                    destinationAirports.get(0).trim(),
+                    sourceAirports.get(0).trim(),
+                    stop,
+                    bookingType,
+                    departureType,
+                    minPrice,
+                    maxPrice,
+                    passengers
+            ));
+        }
+
+        case MULTI_CITY -> {
+            for (int i = 0; i < Math.min(sourceAirports.size(), destinationAirports.size()); i++) {
+                String src = sourceAirports.get(i).trim();
+                String dest = destinationAirports.get(i).trim();
+
+                if (src.isEmpty() || dest.isEmpty()) continue;
+
+                result.add(getFlightsByFilters(
+                        airline,
+                        src,
+                        dest,
+                        stop,
+                        bookingType,
+                        departureType,
+                        minPrice,
+                        maxPrice,
+                        passengers
+                ));
+            }
+          }
+         default -> throw new IllegalArgumentException("Unsupported TripType: " + tripType);
+       }
+
+       return result;
+    }
+
+    
     public List<Flights> getFlightsByFilters(
             String airline,
             String sourceAirport,
@@ -57,11 +144,24 @@ public class UserService {
             Double maxPrice,
             Integer passengers
     ) {
+        // Trim and handle nulls
+        airline = (airline != null && !airline.trim().isEmpty()) ? airline.trim() : null;
+        sourceAirport = (sourceAirport != null && !sourceAirport.trim().isEmpty()) ? sourceAirport.trim() : null;
+        destinationAirport = (destinationAirport != null && !destinationAirport.trim().isEmpty()) ? destinationAirport.trim() : null;
+
         return flightRepository.findFlightsByFilters(
-                airline, sourceAirport, destinationAirport, stop,
-                bookingType, departureType, minPrice, maxPrice, passengers
+                airline,
+                sourceAirport,
+                destinationAirport,
+                stop,
+                bookingType,
+                departureType,
+                minPrice,
+                maxPrice,
+                passengers
         );
     }
+
 
     // Book a flight for a user with passengers
     @Transactional
