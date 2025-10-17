@@ -7,6 +7,8 @@ import java.util.List;
 
 @Repository
 public interface PassengerRepository extends JpaRepository<Passenger, Long> {
+	
 	Passenger findByPassportNumber(String passportNumber);
-    List<Passenger> findByUser_UserID(String userId);
+
+	List<Passenger> findByUser_UserID(String userId);
 }

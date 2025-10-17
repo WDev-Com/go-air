@@ -1,5 +1,6 @@
 package com.go_air.controller;
 
+import com.go_air.aop.ValidateFlightData;
 import com.go_air.entity.Booking;
 import com.go_air.entity.Flights;
 import com.go_air.entity.User;
@@ -24,6 +25,7 @@ public class UserController {
     private UserService userService;
     
     @GetMapping("/flights/search")
+    @ValidateFlightData
     public ResponseEntity<?> searchFlights(
             @RequestParam TripType tripType,
             @RequestParam(required = false) String airline,
@@ -80,6 +82,7 @@ public class UserController {
     
     // Search Flight
     @GetMapping("/flights")
+    @ValidateFlightData
     public ResponseEntity<List<Flights>> getFlightsByFilters(
             @RequestParam(required = false) String airline,
             @RequestParam(required = false) String sourceAirport,
@@ -100,6 +103,7 @@ public class UserController {
 
     // For Booking
     @PostMapping("/book/{userId}")
+    @ValidateFlightData
     public ResponseEntity<Map<String, Object>> bookFlight(
             @PathVariable String userId,
             @RequestBody Booking bookingRequest) {
@@ -149,6 +153,7 @@ public class UserController {
    
     // Create user
     @PostMapping("/create")
+    @ValidateFlightData
     public ResponseEntity<User> createUser(@RequestBody User user) {
         User createdUser = userService.createUser(user);
         return ResponseEntity.status(201).body(createdUser);
@@ -174,6 +179,7 @@ public class UserController {
 
     // Update user
     @PutMapping("/{userId}")
+    @ValidateFlightData
     public ResponseEntity<User> updateUser(@PathVariable String userId, @RequestBody User user) {
         User updatedUser = userService.updateUser(userId, user);
         if (updatedUser != null) {

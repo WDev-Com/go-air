@@ -26,9 +26,6 @@ public class PassengerTicketDTO {
     private LocalDate arrivalDate;
     private LocalTime arrivalTime;
 
-
-    
-    
     private String sourceAirport;
     private String destinationAirport;
     private Integer stop;
