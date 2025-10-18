@@ -16,10 +16,12 @@ import com.go_air.repo.FlightRepository;
 import com.go_air.repo.PassengerRepository;
 import com.go_air.repo.UserRepository;
 
-import jakarta.transaction.Transactional;
+
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -46,6 +48,8 @@ public class UserService {
     @Autowired
     private AdminService adminService; // fetch flight info
 
+    @Autowired
+    private PasswordEncoder passwordEncoder;
     
     public List<List<Flights>> searchFlightsByTripType(
         TripType tripType,
@@ -353,6 +357,7 @@ public class UserService {
         if (user.getUserID() == null || user.getUserID().isEmpty()) {
             user.setUserID(generateUserID());
         }
+        user.setPassword(passwordEncoder.encode(user.getPassword()));
         return userRepository.save(user);
     }
 
@@ -388,5 +393,32 @@ public class UserService {
         User existingUser = getUserById(userId);
         userRepository.delete(existingUser);
     }
+
+    /**
+     * Retrieves a User entity by username within a transactional (read-only) context.
+     * <p>
+     * This method ensures that all lazily-loaded associations such as
+     * {@code passengers} and {@code bookings} are initialized while the
+     * Hibernate session is still active, preventing LazyInitializationException.
+     * <p>
+     * The {@code @Transactional(readOnly = true)} annotation maintains a read-only
+     * session for efficient data retrieval without modifying the database.
+     *
+     * @param username the username of the user to retrieve
+     * @return the fully initialized User entity with associated passengers and bookings
+     */
+
+    @Transactional(readOnly = true)
+    public User findByUserName(String username) {
+        User user = userRepository.findByUsername(username);
+
+//         Force lazy collections to load before session closes
+        user.getPassengers().size(); // initializes the passengers collection
+        user.getBookings().size();   // initializes the bookings collection
+
+        return userRepository.findByUsername(username);
+    }
+
+
 
 }

@@ -5,6 +5,7 @@ import com.go_air.entity.User;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -12,6 +13,8 @@ import org.springframework.stereotype.Repository;
 public interface UserRepository extends JpaRepository<User, String> {
 
     User findByEmail(String email);
+    
+    User findByUsername(String username);
     
     // Find user by userID
     Optional<User> findByUserID(String userID);
