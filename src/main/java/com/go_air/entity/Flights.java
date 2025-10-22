@@ -25,11 +25,13 @@ public class Flights {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
+    @Column(name = "airline")
     private String airline;
     @Column(nullable = false, unique = true) 
     private String flightNumber;
+    @Column(name = "source_airport")
     private String sourceAirport;
+    @Column(name = "destination_airport")
     private String destinationAirport;
     private int stop;
     private String destinationStop;
@@ -49,6 +51,6 @@ public class Flights {
     private LocalTime arrivalTime;
 
     private int durationMinutes;
-    private double price;
+    private Integer price;
     private int availableSeats;
 }

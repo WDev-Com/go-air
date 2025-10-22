@@ -68,7 +68,7 @@ public class JWTHepler {
                 .setSubject(subject)
                 .setIssuedAt(new Date(System.currentTimeMillis()))
                 .setExpiration(new Date(System.currentTimeMillis() + JWT_TOKEN_VALIDITY * 1000))
-                .signWith(secretKey, SignatureAlgorithm.HS512) 
+                .signWith(secretKey, SignatureAlgorithm.HS256) 
                 .compact();
     }
 

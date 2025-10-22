@@ -17,20 +17,32 @@ import com.go_air.entity.User;
 public class FlightValidationAspect {
 
     // Run for all Flights, Booking, and User objects in controller methods
-    @Before("@annotation(com.go_air.aop.ValidateFlightData) || execution(* com.go_air.controller.UserController.*(..))")
-    public void validateControllerInputs(JoinPoint joinPoint) {
-        Object[] args = joinPoint.getArgs();
+	 @Before("@annotation(com.go_air.aop.ValidateFlightData) ||"
+	 		+ " execution(* com.go_air.controller.UserController.*(..))"
+	 		+ "execution(* com.go_air.controller.AdminController.*(..))"
+	 		+ "execution(* com.go_air.controller.AuthController.*(..))")
+	    public void validateControllerInputs(JoinPoint joinPoint) {
+	        Object[] args = joinPoint.getArgs();
+	        String methodName = joinPoint.getSignature().getName();
 
-        for (Object arg : args) {
-            if (arg instanceof Flights flight) {
-                validateFlight(flight);
-            } else if (arg instanceof Booking booking) {
-                validateBooking(booking);
-            } else if (arg instanceof User user) {
-                validateUser(user);
-            }
-        }
-    }
+	        for (Object arg : args) {
+	            if (arg instanceof Flights flight) {
+	                validateFlight(flight);
+	            } else if (arg instanceof Booking booking) {
+	                validateBooking(booking);
+	            } else if (arg instanceof User user) {
+	                //Differentiate validation by method
+	                if (methodName.equals("createUser")) {
+	                    validateSignupUser(user);
+	                } else if (methodName.equals("updateUser")) {
+	                    validateUpdateUser(user);
+	                } else {
+	                    // Default full validation (optional)
+	                    validateUpdateUser(user);
+	                }
+	            }
+	        }
+	    }
 
     // FLIGHT VALIDATION 
     private void validateFlight(Flights flight) {
@@ -117,12 +129,33 @@ public class FlightValidationAspect {
     }
 
     // USER VALIDATION 
-    private void validateUser(User user) {
-    	// Name validation
-    	if (isBlank(user.getName()))
-            throw new IllegalArgumentException("User name is required");
+    private void validateSignupUser(User user) {
+        if (isBlank(user.getUsername()))
+            throw new IllegalArgumentException("Username is required");
 
-        // Email validation using regex
+        if (user.getUsername().length() <= 6)
+            throw new IllegalArgumentException("Username must be longer than 6 characters");
+
+        if (isBlank(user.getPassword()))
+            throw new IllegalArgumentException("Password is required");
+
+        String password = user.getPassword();
+
+        if (password.length() < 8)
+            throw new IllegalArgumentException("Password must be at least 8 characters long");
+
+        if (!password.matches(".*[A-Z].*"))
+            throw new IllegalArgumentException("Password must contain at least one uppercase letter");
+
+        if (!password.matches(".*[!@#$%^&*(),.?\":{}|<>].*"))
+            throw new IllegalArgumentException("Password must contain at least one special character");
+    }
+
+    // Update validation (check name, email, contact)
+    private void validateUpdateUser(User user) {
+        if (isBlank(user.getName()))
+            throw new IllegalArgumentException("User name is required ##");
+
         if (isBlank(user.getEmail()))
             throw new IllegalArgumentException("Email is required");
 
@@ -130,14 +163,12 @@ public class FlightValidationAspect {
         if (!user.getEmail().matches(emailRegex))
             throw new IllegalArgumentException("Invalid email format");
 
-        // Contact validation: not blank and digits only
         if (isBlank(user.getContact()))
             throw new IllegalArgumentException("Contact number is required");
 
-        String contactRegex = "^[7-9][0-9]{9}$"; // starts with 7/8/9 and total 10 digits
+        String contactRegex = "^[7-9][0-9]{9}$"; // 10 digits, starts with 7/8/9
         if (!user.getContact().matches(contactRegex))
             throw new IllegalArgumentException("Invalid contact number format. Must be 10 digits starting with 7, 8, or 9");
-
-
     }
+
 }

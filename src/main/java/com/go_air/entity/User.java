@@ -15,11 +15,12 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@ToString
+@ToString(exclude = {"bookings", "passengers"})
 @Entity
 @Table(name = "users")
 public class User implements UserDetails{
-
+	
+	private static final long serialVersionUID = 1L;
 	 @Id
 	 @Column(length = 6) 
 	 private String userID;
@@ -27,9 +28,9 @@ public class User implements UserDetails{
 	 private String password;
     private String name;
     private String address;
-    @Column(unique = true, nullable = false)
+    @Column(unique = true, nullable = true)
     private String contact;
-    @Column(unique = true, nullable = false)
+    @Column(unique = true, nullable = true)
     private String email;
     private String role;
 

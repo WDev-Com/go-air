@@ -7,6 +7,7 @@ import com.go_air.entity.User;
 import com.go_air.enums.BookingStatus;
 import com.go_air.enums.BookingType;
 import com.go_air.enums.DepartureType;
+import com.go_air.enums.SpecialFareType;
 import com.go_air.enums.TripType;
 import com.go_air.model.dtos.BookingResponseDTO;
 import com.go_air.model.dtos.PassengerResponseDTO;
@@ -27,7 +28,11 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
 @Service
@@ -51,121 +56,134 @@ public class UserService {
     @Autowired
     private PasswordEncoder passwordEncoder;
     
-    public List<List<Flights>> searchFlightsByTripType(
-        TripType tripType,
-        String airline,
-        List<String> sourceAirports,
-        List<String> destinationAirports,
-        List<LocalDate> departureDates,
-        Integer stop,
-        BookingType bookingType,
-        DepartureType departureType,
-        Double minPrice,
-        Double maxPrice,
-        Integer passengers
-       ) {
-       List<List<Flights>> result = new ArrayList<>();
-
-       if (sourceAirports == null || destinationAirports == null || sourceAirports.isEmpty() || destinationAirports.isEmpty()) {
-           throw new IllegalArgumentException("Source and destination airports must not be empty for the selected trip type.");
-       }
-
-       switch (tripType) {
-        case ONE_WAY -> result.add(getFlightsByFilters(
-                airline,
-                sourceAirports.get(0).trim(),
-                destinationAirports.get(0).trim(),
-                stop,
-                bookingType,
-                departureType,
-                minPrice,
-                maxPrice,
-                passengers
-        ));
-
-        case ROUND_TRIP -> {
-            // Going flight
-            result.add(getFlightsByFilters(
-                    airline,
-                    sourceAirports.get(0).trim(),
-                    destinationAirports.get(0).trim(),
-                    stop,
-                    bookingType,
-                    departureType,
-                    minPrice,
-                    maxPrice,
-                    passengers
-            ));
-            // Return flight
-            result.add(getFlightsByFilters(
-                    airline,
-                    destinationAirports.get(0).trim(),
-                    sourceAirports.get(0).trim(),
-                    stop,
-                    bookingType,
-                    departureType,
-                    minPrice,
-                    maxPrice,
-                    passengers
-            ));
-        }
-
-        case MULTI_CITY -> {
-            for (int i = 0; i < Math.min(sourceAirports.size(), destinationAirports.size()); i++) {
-                String src = sourceAirports.get(i).trim();
-                String dest = destinationAirports.get(i).trim();
-
-                if (src.isEmpty() || dest.isEmpty()) continue;
-
-                result.add(getFlightsByFilters(
-                        airline,
-                        src,
-                        dest,
-                        stop,
-                        bookingType,
-                        departureType,
-                        minPrice,
-                        maxPrice,
-                        passengers
-                ));
-            }
-          }
-         default -> throw new IllegalArgumentException("Unsupported TripType: " + tripType);
-       }
-
-       return result;
-    }
-
     
-    public List<Flights> getFlightsByFilters(
+    public Map<String, List<Flights>> searchFlightsByTripType(
+            TripType tripType,
             String airline,
-            String sourceAirport,
-            String destinationAirport,
+            List<String> sourceAirports,
+            List<String> destinationAirports,
             Integer stop,
             BookingType bookingType,
             DepartureType departureType,
-            Double minPrice,
-            Double maxPrice,
-            Integer passengers
+            Integer minPrice,
+            Integer maxPrice,
+            Integer passengers,
+            SpecialFareType specialFareType
     ) {
-        // Trim and handle nulls
-        airline = (airline != null && !airline.trim().isEmpty()) ? airline.trim() : null;
-        sourceAirport = (sourceAirport != null && !sourceAirport.trim().isEmpty()) ? sourceAirport.trim() : null;
-        destinationAirport = (destinationAirport != null && !destinationAirport.trim().isEmpty()) ? destinationAirport.trim() : null;
+        Map<String, List<Flights>> result = new LinkedHashMap<>();
 
-        return flightRepository.findFlightsByFilters(
-                airline,
-                sourceAirport,
-                destinationAirport,
-                stop,
-                bookingType,
-                departureType,
-                minPrice,
-                maxPrice,
-                passengers
-        );
+        if (sourceAirports == null || destinationAirports == null
+                || sourceAirports.isEmpty() || destinationAirports.isEmpty()) {
+            throw new IllegalArgumentException("Source and destination airports must not be empty for the selected trip type.");
+        }
+
+        final String trimmedAirline = (airline != null && !airline.trim().isEmpty()) ? airline.trim() : null;
+
+        List<String> validSources = sourceAirports.stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
+
+        List<String> validDestinations = destinationAirports.stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
+
+        // Adjust price based on special fare type
+        final Integer adjustedMaxPrice;
+        if (specialFareType != null) {
+            specialFareType.validatePassengers(passengers);
+            adjustedMaxPrice = specialFareType.applyDiscount(maxPrice);
+        } else {
+            adjustedMaxPrice = maxPrice;
+        }
+
+        // Safe fetch function (no departureDate)
+        BiFunction<String, String, List<Flights>> fetchAndDiscount = (src, dest) ->
+                applyPostFareDiscount(getFlightsByFilters(
+                        trimmedAirline, src, dest,
+                        stop, bookingType, departureType,
+                        minPrice, adjustedMaxPrice, passengers
+                ), specialFareType, passengers);
+
+        // Perform search based on trip type
+        switch (tripType) {
+            case ONE_WAY -> {
+                String key = validSources.get(0) + "_" + validDestinations.get(0);
+                result.put(key, fetchAndDiscount.apply(validSources.get(0), validDestinations.get(0)));
+            }
+
+            case ROUND_TRIP -> {
+                String forwardKey = validSources.get(0) + "_" + validDestinations.get(0);
+                String returnKey = validDestinations.get(0) + "_" + validSources.get(0);
+
+                result.put(forwardKey, fetchAndDiscount.apply(validSources.get(0), validDestinations.get(0)));
+                result.put(returnKey, fetchAndDiscount.apply(validDestinations.get(0), validSources.get(0)));
+            }
+
+            case MULTI_CITY -> {
+                int trips = Math.min(validSources.size(), validDestinations.size());
+                for (int i = 0; i < trips; i++) {
+                    String src = validSources.get(i);
+                    String dest = validDestinations.get(i);
+                    if (src.isEmpty() || dest.isEmpty()) continue;
+
+                    String key = src + "_" + dest;
+                    result.put(key, fetchAndDiscount.apply(src, dest));
+                }
+            }
+
+            default -> throw new IllegalArgumentException("Unsupported TripType: " + tripType);
+        }
+
+        return result;
     }
 
+
+
+
+    private List<Flights> applyPostFareDiscount(List<Flights> flights, SpecialFareType fareType, Integer passengers) {
+        if (fareType == null) return flights;
+
+        fareType.validatePassengers(passengers);
+
+        for (Flights f : flights) {
+        	Integer discountedPrice = fareType.applyDiscount(f.getPrice());
+            f.setPrice((int) (Math.round(discountedPrice * 100.0) / 100.0)); // round to 2 decimals
+        }
+        return flights;
+    }
+
+    public List<Flights> getFlightsByFilters(
+        String airline,
+        String sourceAirport,
+        String destinationAirport,
+        Integer stop,
+        BookingType bookingType,
+        DepartureType departureType,
+        Integer minPrice,
+        Integer maxPrice,
+        Integer passengers
+) {
+    // Trim and handle nulls
+    airline = (airline != null && !airline.trim().isEmpty()) ? airline.trim() : null;
+    sourceAirport = (sourceAirport != null && !sourceAirport.trim().isEmpty()) ? sourceAirport.trim() : null;
+    destinationAirport = (destinationAirport != null && !destinationAirport.trim().isEmpty()) ? destinationAirport.trim() : null;
+
+    return flightRepository.findFlightsByFilters(
+            airline,
+            sourceAirport,
+            destinationAirport,
+            stop,
+            bookingType,
+            departureType,
+            minPrice,
+            maxPrice,
+            passengers
+    );
+}
 
     // Book a flight for a user with passengers
     @Transactional
@@ -199,7 +217,7 @@ public class UserService {
                     );
 
             if (bookedSameFlight) {
-                throw new RuntimeException("Passenger " + passenger.getName() +
+                throw new RuntimeException("## Passenger " + passenger.getName() +
                         " is already booked on flight " + flight.getFlightNumber());
             }
 
@@ -350,17 +368,30 @@ public class UserService {
                 .collect(Collectors.toList());
     }
 
-
-    
-    // Create user
+    // Create user with only username and password
     public User createUser(User user) {
-        if (user.getUserID() == null || user.getUserID().isEmpty()) {
-            user.setUserID(generateUserID());
+        if (userRepository.existsByUsername(user.getUsername())) {
+            throw new RuntimeException("Username already exists");
         }
-        user.setPassword(passwordEncoder.encode(user.getPassword()));
-        return userRepository.save(user);
+        
+        User newUser = new User();
+        newUser.setUserID(generateUserID());
+        newUser.setUsername(user.getUsername());
+        newUser.setPassword(passwordEncoder.encode(user.getPassword()));
+        newUser.setName(null);
+        newUser.setAddress(null);
+        newUser.setContact(null);
+        newUser.setEmail(null);
+        newUser.setRole("USER"); // default role
+        return userRepository.save(newUser);
     }
 
+    // Check if username exists
+    public boolean existsByUsername(String username) {
+        return userRepository.existsByUsername(username);
+    }
+
+    // Generate User ID
     private String generateUserID() {
         return "USR" + String.format("%03d", (int)(Math.random() * 1000));
     }
@@ -377,9 +408,22 @@ public class UserService {
     }
 
     // Update user
-    public User updateUser(String userId, User userDetails) {
-        User existingUser = getUserById(userId);
+    @Transactional
+    public User updateUserByUsername(String username, User userDetails) {
+        User existingUser = userRepository.findByUsername(username);
+        if (existingUser == null) {
+            throw new IllegalArgumentException("User not found with username: " + username);
+        }
+        // Check if contact or email already exists for another user
+        User userByContact = userRepository.findByContact(userDetails.getContact());
+        if (userByContact != null && !userByContact.getUsername().equals(username)) {
+            throw new RuntimeException("User with this contact already exists!");
+        }
 
+        User userByEmail = userRepository.findByEmail(userDetails.getEmail());
+        if (userByEmail != null && !userByEmail.getUsername().equals(username)) {
+            throw new RuntimeException("User with this email already exists!");
+        }
         existingUser.setName(userDetails.getName());
         existingUser.setEmail(userDetails.getEmail());
         existingUser.setContact(userDetails.getContact());
@@ -387,6 +431,7 @@ public class UserService {
 
         return userRepository.save(existingUser);
     }
+
 
     // Delete user
     public void deleteUser(String userId) {

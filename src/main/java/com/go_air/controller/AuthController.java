@@ -1,7 +1,6 @@
 package com.go_air.controller;
 
 import java.security.Principal;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -28,8 +27,10 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.go_air.aop.ValidateFlightData;
 import com.go_air.entity.RefreshToken;
 import com.go_air.entity.User;
 import com.go_air.jwt.JWTHepler;
@@ -89,66 +90,58 @@ public class AuthController{
 	@PostMapping("/adduser")
 	public ResponseEntity<User> addUser(@RequestBody User userModel){
 		User u = null;
-		try {
+
 			u = this.userservice.createUser(userModel);
 		    System.out.println(u);
 		    return ResponseEntity.status(HttpStatus.CREATED).body(u);
-		}catch (Exception e) {
-			// TODO: handle exception
-			e.printStackTrace();
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-		}
 	}
 	
-	
-	
-	@PostMapping("/createuser")
-	public ResponseEntity<Map<User,String>> createUser(@RequestBody User userModel){
-		try {
-	        System.out.println(userModel);
-	        User user = userservice.createUser(userModel);
-	        Map<User, String> data = new HashMap<>();
-	        data.put(user, "User Created");
-		    return ResponseEntity.status(HttpStatus.OK).body(data);
-		}catch (BadCredentialsException e) {
-			System.out.println("Line 109 RestApp");
-            throw new BadCredentialsException(" Duplicate UserName : "+e.toString());
+	 // Create User (only username and password)
+    @PostMapping("/signup")
+    @ValidateFlightData
+    public ResponseEntity<Map<String, String>> createUser(@RequestBody User userModel) {
+        if (userModel.getUsername() == null || userModel.getPassword() == null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("message", "Username and Password are required"));
         }
-	}
-	
+
+        User createdUser = userservice.createUser(userModel);
+        return ResponseEntity.status(HttpStatus.OK)
+                .body(Map.of("message", "User created successfully", "userID", createdUser.getUserID()));
+    }
+    
+    // Check Username Availability
+    @GetMapping("/checkusername")
+    public ResponseEntity<Map<String, String>> checkUsernameAvailability(@RequestParam String username) {
+        boolean exists = userservice.existsByUsername(username);
+        if (exists) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("message", "Username is already taken"));
+        }
+        return ResponseEntity.ok(Map.of("message", "Username is available"));
+    }
+
+   
 	@ExceptionHandler(DataIntegrityViolationException.class)
     public String exceptionHandlerDupicateUsername(String str) {
         return  str;
     }
-	
-	
+
 	// ID is important in JPA configuration for updating the data
-	@PatchMapping("/updateuser")
-	public ResponseEntity<String> updateUser(@RequestBody User userModel){
-		try {
-			String userid = userModel.getUserID();
-			userservice.updateUser(userid,userModel);
-		    System.out.println(userModel);
-		    return ResponseEntity.status(HttpStatus.CREATED).body("Updated Successfully");
-		}catch (Exception e) {
-			// TODO: handle exception
-			System.out.println(e);
-			String error = "Error "+e;
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
-		}
+	@PatchMapping("/updateuser/{username}")
+	@ValidateFlightData
+	public ResponseEntity<String> updateUser(@PathVariable String username, @RequestBody User userModel) {
+	    userservice.updateUserByUsername(username, userModel);
+	    System.out.println(userModel);
+	    return ResponseEntity.status(HttpStatus.OK).body("Updated Successfully");
 	}
-	
+
 	@DeleteMapping("/delete/{username}")
 	public ResponseEntity<String> deleteUser(@PathVariable String username){
-		try {
 		userservice.deleteUser(username);
 		System.out.println("Deleted : "+username);
 		return ResponseEntity.status(HttpStatus.OK).build();
-		}catch (Exception e) {
-			System.out.println(e);
-			String error = username+" : Not Found or some other error or "+e;
-			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error);
-		}
+		
 	}
 	
 	///////////////////////////////////// JWT AUth
@@ -174,7 +167,7 @@ public class AuthController{
 	        
 	        UserDetails userDetails = userDetailsService.loadUserByUsername(request.getUsername());
 	        logger.atInfo().log("Loaded User ",userDetails);
-//	        String pass = userDetails.getPassword()
+	        //String pass = userDetails.getPassword()
 	        String token = this.helper.generateToken(userDetails);
             RefreshToken refreshToken =  this.refreshTokenService.createRefreshToken(userDetails.getUsername());
 	        JwtResponse response = JwtResponse.builder()
@@ -216,14 +209,7 @@ public class AuthController{
 	    private void doAuthenticate(String username, String password) {
 
 	        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(username, password);
-	        try {
 	            manager.authenticate(authentication);
-
-
-	        } catch (BadCredentialsException e) {
-	            throw new BadCredentialsException(" Invalid Username or Password  !!");
-	        }
-
 	    }
        
 	

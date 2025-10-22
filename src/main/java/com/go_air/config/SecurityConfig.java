@@ -42,17 +42,18 @@ class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(
-                    "/auth/login",
-                    "/auth/user",
-                    "/auth/createuser",
-                    "/auth/adduser",
-                    "/auth/refreshToken"
+                		"/auth/login",
+                        "/auth/user",
+                        "/auth/checkusername",
+                        "/auth/signup",                         
+                        "/auth/adduser",
+                        "/auth/refreshToken"
                 ).permitAll()
-                .requestMatchers("/user/**", "/admin/**").authenticated()
+                
                 .anyRequest().authenticated()
             )
-            .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtEntryPoint))
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtEntryPoint))
             .logout(logout -> logout
                 .logoutUrl("/api/logout")
                 .logoutSuccessHandler((request, response, authentication) -> {
@@ -60,7 +61,9 @@ class SecurityConfig {
                     if (token != null) tokenBlacklistService.addToBlacklist(token);
                     response.setStatus(HttpServletResponse.SC_OK);
                 })
+                
                 .invalidateHttpSession(true)
+                
             );
 
         http.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);

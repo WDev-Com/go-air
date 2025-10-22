@@ -6,6 +6,7 @@ import com.go_air.entity.Flights;
 import com.go_air.entity.User;
 import com.go_air.enums.BookingType;
 import com.go_air.enums.DepartureType;
+import com.go_air.enums.SpecialFareType;
 import com.go_air.enums.TripType;
 import com.go_air.model.dtos.BookingResponseDTO;
 import com.go_air.model.dtos.PassengerTicketDTO;
@@ -14,8 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.*;
-import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
+
 
 @RestController
 @RequestMapping("/user")
@@ -34,12 +34,13 @@ public class UserController {
             @RequestParam(required = false) Integer stop,
             @RequestParam(required = false) BookingType bookingType,
             @RequestParam(required = false) DepartureType departureType,
-            @RequestParam(required = false) Double minPrice,
-            @RequestParam(required = false) Double maxPrice,
+            @RequestParam(required = false) Integer minPrice,
+            @RequestParam(required = false) Integer maxPrice,
             @RequestParam(required = false) Integer passengers,
-            @RequestParam String departureDates          // comma-separated
+            @RequestParam(required = false) SpecialFareType specialFareType // ✅ enum param
     ) {
-        // Convert comma-separated strings to lists
+
+        // Parse comma-separated airport and date values
         List<String> sources = Arrays.stream(sourceAirports.split(","))
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
@@ -50,30 +51,24 @@ public class UserController {
                 .filter(s -> !s.isEmpty())
                 .toList();
 
-        // Parse dates with a formatter that handles single-digit day/month
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-M-d");
-        List<LocalDate> dates = Arrays.stream(departureDates.split(","))
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .map(s -> LocalDate.parse(s, formatter))
-                .toList();
-
-        // Clean airline parameter
+      
         airline = (airline != null && !airline.trim().isEmpty()) ? airline.trim() : null;
 
-        // Call service
-        List<List<Flights>> flights = userService.searchFlightsByTripType(
+       
+
+        // Call service method
+        Map<String, List<Flights>> flights = userService.searchFlightsByTripType(
                 tripType,
                 airline,
                 sources,
                 destinations,
-                dates,
                 stop,
                 bookingType,
                 departureType,
                 minPrice,
                 maxPrice,
-                passengers
+                passengers,
+                specialFareType
         );
 
         return ResponseEntity.ok(flights);
@@ -90,9 +85,10 @@ public class UserController {
             @RequestParam(required = false) Integer stop,
             @RequestParam(required = false) BookingType bookingType,
             @RequestParam(required = false) DepartureType departureType,
-            @RequestParam(required = false) Double minPrice,
-            @RequestParam(required = false) Double maxPrice,
+            @RequestParam(required = false) Integer minPrice,
+            @RequestParam(required = false) Integer maxPrice,
             @RequestParam(required = false) Integer passengers
+            
     ) {
         List<Flights> flights = userService.getFlightsByFilters(
                 airline, sourceAirport, destinationAirport, stop,
@@ -135,8 +131,6 @@ public class UserController {
         return ResponseEntity.ok(bookings);
     }
 
-
-    
     // Cancel a booking
     @PutMapping("/cancel/{bookingId}")
     public ResponseEntity<Map<String, String>> cancelBooking(@PathVariable Long bookingId) {
@@ -148,15 +142,6 @@ public class UserController {
         response.put("status", cancelledBooking.getStatus().toString());
 
         return ResponseEntity.ok(response); // 200 OK
-    }
-
-   
-    // Create user
-    @PostMapping("/create")
-    @ValidateFlightData
-    public ResponseEntity<User> createUser(@RequestBody User user) {
-        User createdUser = userService.createUser(user);
-        return ResponseEntity.status(201).body(createdUser);
     }
 
     // Get all users
@@ -172,18 +157,6 @@ public class UserController {
         User user = userService.getUserById(userId);
         if (user != null) {
             return ResponseEntity.ok(user);
-        } else {
-            return ResponseEntity.notFound().build();
-        }
-    }
-
-    // Update user
-    @PutMapping("/{userId}")
-    @ValidateFlightData
-    public ResponseEntity<User> updateUser(@PathVariable String userId, @RequestBody User user) {
-        User updatedUser = userService.updateUser(userId, user);
-        if (updatedUser != null) {
-            return ResponseEntity.ok(updatedUser);
         } else {
             return ResponseEntity.notFound().build();
         }
