@@ -32,7 +32,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -56,12 +56,17 @@ public class UserService {
     @Autowired
     private PasswordEncoder passwordEncoder;
     
+    public List<Flights> getFlightsByDepartureDate(LocalDate departureDate) {
+        return flightRepository.findFlightsByDepartureDate(departureDate);
+    }
+    
     
     public Map<String, List<Flights>> searchFlightsByTripType(
             TripType tripType,
             String airline,
             List<String> sourceAirports,
             List<String> destinationAirports,
+            List<LocalDate> departureDates, // <-- accepts as String list
             Integer stop,
             BookingType bookingType,
             DepartureType departureType,
@@ -79,6 +84,7 @@ public class UserService {
 
         final String trimmedAirline = (airline != null && !airline.trim().isEmpty()) ? airline.trim() : null;
 
+        // Clean source & destination lists
         List<String> validSources = sourceAirports.stream()
                 .filter(Objects::nonNull)
                 .map(String::trim)
@@ -91,6 +97,7 @@ public class UserService {
                 .filter(s -> !s.isEmpty())
                 .toList();
 
+ 
         // Adjust price based on special fare type
         final Integer adjustedMaxPrice;
         if (specialFareType != null) {
@@ -100,49 +107,81 @@ public class UserService {
             adjustedMaxPrice = maxPrice;
         }
 
-        // Safe fetch function (no departureDate)
-        BiFunction<String, String, List<Flights>> fetchAndDiscount = (src, dest) ->
-                applyPostFareDiscount(getFlightsByFilters(
-                        trimmedAirline, src, dest,
-                        stop, bookingType, departureType,
-                        minPrice, adjustedMaxPrice, passengers
-                ), specialFareType, passengers);
+        // Record for clean parameter passing
+        record FlightParams(String src, String dest, LocalDate date) {}
+
+        // Fetch + Discount function
+        Function<FlightParams, List<Flights>> fetchAndDiscount = params ->
+                applyPostFareDiscount(
+                        getFlightsByFilters(
+                                trimmedAirline, params.src(), params.dest(), params.date(),
+                                stop, bookingType, departureType,
+                                minPrice, adjustedMaxPrice, passengers
+                        ),
+                        specialFareType,
+                        passengers
+                );
 
         // Perform search based on trip type
         switch (tripType) {
             case ONE_WAY -> {
                 String key = validSources.get(0) + "_" + validDestinations.get(0);
-                result.put(key, fetchAndDiscount.apply(validSources.get(0), validDestinations.get(0)));
+                result.put(key, fetchAndDiscount.apply(new FlightParams(
+                        validSources.get(0),
+                        validDestinations.get(0),
+                        departureDates.get(0)
+                )));
             }
 
             case ROUND_TRIP -> {
                 String forwardKey = validSources.get(0) + "_" + validDestinations.get(0);
                 String returnKey = validDestinations.get(0) + "_" + validSources.get(0);
 
-                result.put(forwardKey, fetchAndDiscount.apply(validSources.get(0), validDestinations.get(0)));
-                result.put(returnKey, fetchAndDiscount.apply(validDestinations.get(0), validSources.get(0)));
+                result.put(forwardKey, fetchAndDiscount.apply(new FlightParams(
+                        validSources.get(0),
+                        validDestinations.get(0),
+                        departureDates.get(0)
+                )));
+
+             // Return flight should be on the next day
+                LocalDate returnDate;
+                if (departureDates.size() > 1) {
+                    // If user provided both dates, use the second one
+                    returnDate = departureDates.get(1);
+                } else {
+                    // Otherwise, automatically set as next day
+                    returnDate = departureDates.get(0).plusDays(1);
+                }
+
+                result.put(returnKey, fetchAndDiscount.apply(new FlightParams(
+                        validDestinations.get(0),
+                        validSources.get(0),
+                        returnDate
+                )));
             }
 
             case MULTI_CITY -> {
-                int trips = Math.min(validSources.size(), validDestinations.size());
+                int trips = Math.min(
+                        Math.min(validSources.size(), validDestinations.size()),
+                        departureDates.size()
+                );
+
                 for (int i = 0; i < trips; i++) {
                     String src = validSources.get(i);
                     String dest = validDestinations.get(i);
+                    LocalDate date = departureDates.get(i);
+
                     if (src.isEmpty() || dest.isEmpty()) continue;
 
                     String key = src + "_" + dest;
-                    result.put(key, fetchAndDiscount.apply(src, dest));
+                    result.put(key, fetchAndDiscount.apply(new FlightParams(src, dest, date)));
                 }
             }
 
             default -> throw new IllegalArgumentException("Unsupported TripType: " + tripType);
         }
-
         return result;
     }
-
-
-
 
     private List<Flights> applyPostFareDiscount(List<Flights> flights, SpecialFareType fareType, Integer passengers) {
         if (fareType == null) return flights;
@@ -160,6 +199,7 @@ public class UserService {
         String airline,
         String sourceAirport,
         String destinationAirport,
+        LocalDate departureDate,
         Integer stop,
         BookingType bookingType,
         DepartureType departureType,
@@ -167,23 +207,29 @@ public class UserService {
         Integer maxPrice,
         Integer passengers
 ) {
-    // Trim and handle nulls
     airline = (airline != null && !airline.trim().isEmpty()) ? airline.trim() : null;
     sourceAirport = (sourceAirport != null && !sourceAirport.trim().isEmpty()) ? sourceAirport.trim() : null;
     destinationAirport = (destinationAirport != null && !destinationAirport.trim().isEmpty()) ? destinationAirport.trim() : null;
 
+    String bookingTypeStr = (bookingType != null) ? bookingType.name() : null;
+    String departureTypeStr = (departureType != null) ? departureType.name() : null;
+
+    
+    
     return flightRepository.findFlightsByFilters(
             airline,
             sourceAirport,
             destinationAirport,
+            departureDate,
             stop,
-            bookingType,
-            departureType,
+            bookingTypeStr,
+            departureTypeStr,
             minPrice,
             maxPrice,
             passengers
     );
-}
+    }
+
 
     // Book a flight for a user with passengers
     @Transactional

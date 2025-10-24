@@ -41,7 +41,7 @@ public class Flights {
 
     @Enumerated(EnumType.STRING)
     private DepartureType departureType;
-
+    @Column(name = "departure_date")
     private LocalDate departureDate;
     @Column(columnDefinition = "TIME WITHOUT TIME ZONE")
     private LocalTime departureTime;

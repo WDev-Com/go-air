@@ -1,9 +1,6 @@
 package com.go_air.repo;
 
 import com.go_air.entity.Flights;
-import com.go_air.enums.BookingType;
-import com.go_air.enums.DepartureType;
-
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -18,23 +15,28 @@ public interface FlightRepository extends JpaRepository<Flights, Long> {
 
 	Optional<Flights> findByFlightNumber(String flightNumber);
 
-	@Query("SELECT f FROM Flights f WHERE " +
-	           "(:airline IS NULL OR f.airline = :airline) AND " +
-	           "(:sourceAirport IS NULL OR f.sourceAirport = :sourceAirport) AND " +
-	           "(:destinationAirport IS NULL OR f.destinationAirport = :destinationAirport) AND " +
-	           "(:stop IS NULL OR f.stop = :stop) AND " +
-	           "(:bookingType IS NULL OR f.bookingType = :bookingType) AND " +
-	           "(:departureType IS NULL OR f.departureType = :departureType) AND " +
-	           "(:minPrice IS NULL OR f.price >= :minPrice) AND " +
-	           "(:maxPrice IS NULL OR f.price <= :maxPrice) AND " +
-	           "(:passengers IS NULL OR f.availableSeats >= :passengers)")
+	@Query(value = """
+			SELECT * FROM flights f
+			WHERE
+			    f.airline = COALESCE(:airline, f.airline) AND
+			    f.source_airport = COALESCE(:sourceAirport, f.source_airport) AND
+			    f.destination_airport = COALESCE(:destinationAirport, f.destination_airport) AND
+			    f.departure_date = COALESCE(:departureDate, f.departure_date) AND
+			    f.stop = COALESCE(:stop, f.stop) AND
+			    f.booking_type = COALESCE(:bookingType, f.booking_type) AND
+			    f.departure_type = COALESCE(:departureType, f.departure_type) AND
+			    f.price >= COALESCE(:minPrice, f.price) AND
+			    f.price <= COALESCE(:maxPrice, f.price) AND
+			    f.available_seats >= COALESCE(:passengers, f.available_seats)
+			""", nativeQuery = true)
 	    List<Flights> findFlightsByFilters(
 	            @Param("airline") String airline,
 	            @Param("sourceAirport") String sourceAirport,
 	            @Param("destinationAirport") String destinationAirport,
+	            @Param("departureDate") LocalDate departureDate,
 	            @Param("stop") Integer stop,
-	            @Param("bookingType") BookingType bookingType,
-	            @Param("departureType") DepartureType departureType,
+	            @Param("bookingType") String bookingType,
+	            @Param("departureType") String departureType,
 	            @Param("minPrice") Integer minPrice,
 	            @Param("maxPrice") Integer maxPrice,
 	            @Param("passengers") Integer passengers
@@ -49,4 +51,11 @@ public interface FlightRepository extends JpaRepository<Flights, Long> {
             LocalDate departureDate,
             LocalTime departureTime
     );
+    
+    
+ // Method 2: Custom JPQL (optional if you need extra filters)
+    @Query("SELECT f FROM Flights f WHERE f.departureDate = :departureDate")
+    List<Flights> findFlightsByDepartureDate(LocalDate departureDate);
+    
+    
 }

@@ -12,8 +12,12 @@ import com.go_air.model.dtos.BookingResponseDTO;
 import com.go_air.model.dtos.PassengerTicketDTO;
 import com.go_air.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 
 
@@ -24,6 +28,19 @@ public class UserController {
     @Autowired
     private UserService userService;
     
+    @GetMapping("/flights/by-date")
+    public ResponseEntity<List<Flights>> getFlightsByDate(
+            @RequestParam("departureDate")
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
+            String departureDateStr) {
+
+        // Trim newline or extra spaces before parsing
+        LocalDate departureDate = LocalDate.parse(departureDateStr.trim());
+        List<Flights> flights = userService.getFlightsByDepartureDate(departureDate);
+        return ResponseEntity.ok(flights);
+    }
+
+    
     @GetMapping("/flights/search")
     @ValidateFlightData
     public ResponseEntity<?> searchFlights(
@@ -31,13 +48,14 @@ public class UserController {
             @RequestParam(required = false) String airline,
             @RequestParam String sourceAirports,       // comma-separated
             @RequestParam String destinationAirports,  // comma-separated
+            @RequestParam(required = false) String departureDates, // comma-separated
             @RequestParam(required = false) Integer stop,
             @RequestParam(required = false) BookingType bookingType,
             @RequestParam(required = false) DepartureType departureType,
             @RequestParam(required = false) Integer minPrice,
             @RequestParam(required = false) Integer maxPrice,
             @RequestParam(required = false) Integer passengers,
-            @RequestParam(required = false) SpecialFareType specialFareType // ✅ enum param
+            @RequestParam(required = false) SpecialFareType specialFareType //enum param
     ) {
 
         // Parse comma-separated airport and date values
@@ -51,6 +69,13 @@ public class UserController {
                 .filter(s -> !s.isEmpty())
                 .toList();
 
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+
+        List<LocalDate> dates = Arrays.stream(departureDates.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .map(s -> LocalDate.parse(s, formatter))
+                .toList();
       
         airline = (airline != null && !airline.trim().isEmpty()) ? airline.trim() : null;
 
@@ -62,6 +87,7 @@ public class UserController {
                 airline,
                 sources,
                 destinations,
+                dates,
                 stop,
                 bookingType,
                 departureType,
@@ -82,20 +108,26 @@ public class UserController {
             @RequestParam(required = false) String airline,
             @RequestParam(required = false) String sourceAirport,
             @RequestParam(required = false) String destinationAirport,
+            @RequestParam(required = false) String departureDateStr, 
             @RequestParam(required = false) Integer stop,
             @RequestParam(required = false) BookingType bookingType,
             @RequestParam(required = false) DepartureType departureType,
             @RequestParam(required = false) Integer minPrice,
             @RequestParam(required = false) Integer maxPrice,
             @RequestParam(required = false) Integer passengers
-            
     ) {
+        LocalDate departureDate = null;
+        if (departureDateStr != null && !departureDateStr.trim().isEmpty()) {
+            departureDate = LocalDate.parse(departureDateStr.trim());
+        }
+        
         List<Flights> flights = userService.getFlightsByFilters(
-                airline, sourceAirport, destinationAirport, stop,
+                airline, sourceAirport, destinationAirport, departureDate, stop,
                 bookingType, departureType, minPrice, maxPrice, passengers
         );
         return ResponseEntity.ok(flights);
     }
+
 
     // For Booking
     @PostMapping("/book/{userId}")
