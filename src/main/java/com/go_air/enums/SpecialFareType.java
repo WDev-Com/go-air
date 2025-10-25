@@ -17,7 +17,7 @@ public enum SpecialFareType {
     }
 
     public Integer applyDiscount(Integer maxPrice) {
-        if (maxPrice == null) maxPrice = 100000;  // default maxPrice
+        if (maxPrice == null) maxPrice = 10000;  // default maxPrice
         return maxPrice - discount;
     }
 

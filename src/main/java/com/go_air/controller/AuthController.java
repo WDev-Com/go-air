@@ -86,7 +86,7 @@ public class AuthController{
 		return principal.getName();
 	}
 	
-	
+	@PreAuthorize("hasAuthority('ADMIN')")
 	@PostMapping("/adduser")
 	public ResponseEntity<User> addUser(@RequestBody User userModel){
 		User u = null;
@@ -166,12 +166,14 @@ public class AuthController{
 
 	        
 	        UserDetails userDetails = userDetailsService.loadUserByUsername(request.getUsername());
-	        logger.atInfo().log("Loaded User ",userDetails);
+	        logger.atInfo().log("Line 168 AuthControler | Loaded User : ",userDetails);
 	        //String pass = userDetails.getPassword()
+	        User user = (User) userDetails;
 	        String token = this.helper.generateToken(userDetails);
             RefreshToken refreshToken =  this.refreshTokenService.createRefreshToken(userDetails.getUsername());
 	        JwtResponse response = JwtResponse.builder()
 	                .jwtToken(token)
+	                .role(user.getRole())
 	                .refreshToken(refreshToken.getRefreshToken())
 	                .username(userDetails.getUsername()).build();
 	        return new ResponseEntity<>(response, HttpStatus.OK);

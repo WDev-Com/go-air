@@ -56,11 +56,6 @@ public class UserService {
     @Autowired
     private PasswordEncoder passwordEncoder;
     
-    public List<Flights> getFlightsByDepartureDate(LocalDate departureDate) {
-        return flightRepository.findFlightsByDepartureDate(departureDate);
-    }
-    
-    
     public Map<String, List<Flights>> searchFlightsByTripType(
             TripType tripType,
             String airline,
@@ -313,8 +308,6 @@ public class UserService {
 
         return savedBooking;
     }
-
-
 
 
     // Cancel booking

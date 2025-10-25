@@ -1,14 +1,14 @@
 package com.go_air.jwt;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.List;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -23,6 +23,9 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+
+import java.util.HashMap;
+import java.util.Map;
 
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -54,44 +57,49 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         String path = request.getServletPath();
 
-        // Skip JWT check for public endpoints
+        // Skip public endpoints
         if (path.startsWith("/auth/login") ||
-            path.startsWith("/auth/createuser") ||
-            path.startsWith("/auth/refreshToken") || 
+            path.startsWith("/auth/signup") ||
+            path.startsWith("/auth/refreshToken") ||
             path.startsWith("/auth/checkusername")) {
             filterChain.doFilter(request, response);
             return;
         }
 
         String token = extractTokenFromRequest(request);
-        String username = null;
 
         if (token != null) {
-            username = jwtHelper.getUsernameFromToken(token); // Let exceptions propagate
-        }
+            // Check if token is blacklisted
+            if (tokenBlacklistService.isTokenBlacklisted(token)) {
+                response.setContentType("application/json");
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                Map<String, String> resp = new HashMap<>();
+                resp.put("status", "FAILED");
+                resp.put("message", "Token is blacklisted. Please login again.");
+                response.getWriter().write(new ObjectMapper().writeValueAsString(resp));
+                return;
+            }
 
-        // Check blacklist first
-        if (token != null && tokenBlacklistService.isTokenBlacklisted(token)) {
-            response.setContentType("application/json");
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            Map<String, String> resp = new HashMap<>();
-            resp.put("status", "FAILED");
-            resp.put("message", "Token is blacklisted. Please login again.");
-            response.getWriter().write(new ObjectMapper().writeValueAsString(resp));
-            return;
-        }
+            String username = jwtHelper.getUsernameFromToken(token);
+            String role = jwtHelper.getRoleFromToken(token);
 
-        // Set authentication if username is valid
-        if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-            UserDetails userDetails = this.userDetailsService.loadUserByUsername(username);
+            if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
-            if (jwtHelper.validateToken(token, userDetails)) {
-                UsernamePasswordAuthenticationToken authentication =
-                        new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-                authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(authentication);
-            } else {
-                logger.info("JWT token validation failed");
+                if (jwtHelper.validateToken(token, userDetails)) {
+                    // Set authorities based on token role
+                    UsernamePasswordAuthenticationToken authentication =
+                            new UsernamePasswordAuthenticationToken(
+                                    userDetails,
+                                    null,
+                                    List.of(new SimpleGrantedAuthority(role))
+                            );
+                    authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+                    logger.info("Authenticated user: {}, Role: {}", username, role);
+
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                }
             }
         }
 

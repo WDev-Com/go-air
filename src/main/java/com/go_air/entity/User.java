@@ -1,7 +1,6 @@
 package com.go_air.entity;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import jakarta.persistence.*;
 import lombok.*;
@@ -20,18 +19,20 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 @Table(name = "users")
 public class User implements UserDetails{
 	
-	private static final long serialVersionUID = 1L;
-	 @Id
-	 @Column(length = 6) 
-	 private String userID;
-	 private String username;
-	 private String password;
+	private static final long serialVersionUID = 1L;	 
+	@Id	
+	@Column(length = 6) 	 
+	private String userID;	 
+	private String username;
+	private String password;
     private String name;
     private String address;
+    
     @Column(unique = true, nullable = true)
     private String contact;
     @Column(unique = true, nullable = true)
     private String email;
+    
     private String role;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL,fetch = FetchType.LAZY)
@@ -46,40 +47,43 @@ public class User implements UserDetails{
     
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        // Assuming your role is a string, prefix it with "ROLE_" as it's a common practice
-        String roleWithPrefix = "ROLE_" + role;
-        return Collections.singletonList(new SimpleGrantedAuthority(roleWithPrefix));
+        return List.of(new SimpleGrantedAuthority(role));
     }
- @Override
- public String getPassword() {
- 	// TODO Auto-generated method stub
- 	return password;
- }
- @Override
- public String getUsername() {
- 	// TODO Auto-generated method stub
- 	return username;
- }
- @Override
- public boolean isAccountNonExpired() {
- 	// TODO Auto-generated method stub
- 	return true;
- }
- @Override
- public boolean isAccountNonLocked() {
- 	// TODO Auto-generated method stub
- 	return true;
- }
- @Override
- public boolean isCredentialsNonExpired() {
- 	// TODO Auto-generated method stub
- 	return true;
- }
- @Override
- public boolean isEnabled() {
- 	// TODO Auto-generated method stub
- 	return true;
- }
+     
+    @Override
+    public String getPassword() {
+    	// TODO Auto-generated method stub
+    	return password;
+    }
+    
+    @Override
+    public String getUsername() {
+    	// TODO Auto-generated method stub
+    	return username;
+    }
+        
+    @Override
+    public boolean isAccountNonExpired() {
+    	// TODO Auto-generated method stub
+    	return true;
+    }
+    
+    @Override
+    public boolean isAccountNonLocked() {
+    	// TODO Auto-generated method stub
+    	return true;
+    }
+    
+    @Override
+    public boolean isCredentialsNonExpired() {
+    	// TODO Auto-generated method stub
+    	return true;
+    }
+    @Override
+    public boolean isEnabled() {
+    	// TODO Auto-generated method stub
+    	return true;
+    }
 
 
 }

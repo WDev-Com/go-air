@@ -12,7 +12,6 @@ import com.go_air.model.dtos.BookingResponseDTO;
 import com.go_air.model.dtos.PassengerTicketDTO;
 import com.go_air.service.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -27,19 +26,6 @@ public class UserController {
 
     @Autowired
     private UserService userService;
-    
-    @GetMapping("/flights/by-date")
-    public ResponseEntity<List<Flights>> getFlightsByDate(
-            @RequestParam("departureDate")
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-            String departureDateStr) {
-
-        // Trim newline or extra spaces before parsing
-        LocalDate departureDate = LocalDate.parse(departureDateStr.trim());
-        List<Flights> flights = userService.getFlightsByDepartureDate(departureDate);
-        return ResponseEntity.ok(flights);
-    }
-
     
     @GetMapping("/flights/search")
     @ValidateFlightData
@@ -78,8 +64,6 @@ public class UserController {
                 .toList();
       
         airline = (airline != null && !airline.trim().isEmpty()) ? airline.trim() : null;
-
-       
 
         // Call service method
         Map<String, List<Flights>> flights = userService.searchFlightsByTripType(

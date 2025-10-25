@@ -53,9 +53,4 @@ public interface FlightRepository extends JpaRepository<Flights, Long> {
     );
     
     
- // Method 2: Custom JPQL (optional if you need extra filters)
-    @Query("SELECT f FROM Flights f WHERE f.departureDate = :departureDate")
-    List<Flights> findFlightsByDepartureDate(LocalDate departureDate);
-    
-    
 }

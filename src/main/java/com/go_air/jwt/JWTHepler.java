@@ -4,6 +4,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
+import java.security.Key;
 
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
@@ -11,7 +12,6 @@ import org.springframework.stereotype.Component;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
-import java.security.Key;
 import io.jsonwebtoken.security.Keys;
 
 @Component
@@ -36,12 +36,13 @@ public class JWTHepler {
         return getClaimFromToken(token, Claims::getExpiration);
     }
 
+    // Retrieve specific claim
     public <T> T getClaimFromToken(String token, Function<Claims, T> claimsResolver) {
         final Claims claims = getAllClaimsFromToken(token);
         return claimsResolver.apply(claims);
     }
 
-    // Retrieve any information from token using the secret key
+    // Retrieve all claims
     private Claims getAllClaimsFromToken(String token) {
         return Jwts.parserBuilder()
                 .setSigningKey(secretKey)
@@ -50,25 +51,32 @@ public class JWTHepler {
                 .getBody();
     }
 
-    // Check if the token has expired
+    // Check if token expired
     private Boolean isTokenExpired(String token) {
         final Date expiration = getExpirationDateFromToken(token);
         return expiration.before(new Date());
     }
 
-    // Generate token for user
+    // Generate token and include role
     public String generateToken(UserDetails userDetails) {
         Map<String, Object> claims = new HashMap<>();
+
+        // Take first authority, remove "ROLE_" if present
+        String fullRole = userDetails.getAuthorities().iterator().next().getAuthority();
+        String role = fullRole.startsWith("ROLE_") ? fullRole.substring(5) : fullRole;
+        claims.put("role", role);
+
         return doGenerateToken(claims, userDetails.getUsername());
     }
 
+    // Core token generation
     private String doGenerateToken(Map<String, Object> claims, String subject) {
         return Jwts.builder()
                 .setClaims(claims)
                 .setSubject(subject)
                 .setIssuedAt(new Date(System.currentTimeMillis()))
                 .setExpiration(new Date(System.currentTimeMillis() + JWT_TOKEN_VALIDITY * 1000))
-                .signWith(secretKey, SignatureAlgorithm.HS256) 
+                .signWith(secretKey, SignatureAlgorithm.HS256)
                 .compact();
     }
 
@@ -76,5 +84,11 @@ public class JWTHepler {
     public Boolean validateToken(String token, UserDetails userDetails) {
         final String username = getUsernameFromToken(token);
         return (username.equals(userDetails.getUsername()) && !isTokenExpired(token));
+    }
+
+    // Extract role from token
+    public String getRoleFromToken(String token) {
+        final Claims claims = getAllClaimsFromToken(token);
+        return (String) claims.get("role");
     }
 }
