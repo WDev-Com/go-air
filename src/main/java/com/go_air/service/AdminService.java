@@ -252,7 +252,7 @@ public class AdminService {
                     .sorted(Comparator.comparing(Seat::getColumnLabel))
                     .collect(Collectors.toList());
 
-            layout.append(String.format("Row %-3d:  ", rowNumber));
+            layout.append(String.format("%-3d:  ", rowNumber));
             layout.append(formatRow(rowSeats, flight.getAircraftSize()));
             layout.append("\n");
         }

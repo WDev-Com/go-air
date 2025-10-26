@@ -3,10 +3,13 @@ package com.go_air.service;
 import com.go_air.entity.Booking;
 import com.go_air.entity.Flights;
 import com.go_air.entity.Passenger;
+import com.go_air.entity.Seat;
 import com.go_air.entity.User;
 import com.go_air.enums.BookingStatus;
 import com.go_air.enums.BookingType;
 import com.go_air.enums.DepartureType;
+import com.go_air.enums.JourneyStatus;
+import com.go_air.enums.SeatStatus;
 import com.go_air.enums.SpecialFareType;
 import com.go_air.enums.TripType;
 import com.go_air.model.dtos.BookingResponseDTO;
@@ -15,6 +18,7 @@ import com.go_air.model.dtos.PassengerTicketDTO;
 import com.go_air.repo.BookingRepository;
 import com.go_air.repo.FlightRepository;
 import com.go_air.repo.PassengerRepository;
+import com.go_air.repo.SeatRepository;
 import com.go_air.repo.UserRepository;
 
 
@@ -55,6 +59,9 @@ public class UserService {
 
     @Autowired
     private PasswordEncoder passwordEncoder;
+    
+    @Autowired
+    private SeatRepository seatRepository;
     
     public Map<String, List<Flights>> searchFlightsByTripType(
             TripType tripType,
@@ -233,7 +240,7 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        // 2️ Fetch flight info from database
+        // 2️ Fetch flight info
         Flights flight = flightRepository.findByFlightNumber(bookingRequest.getFlightNumber())
                 .orElseThrow(() -> new RuntimeException("Flight not found"));
 
@@ -242,63 +249,80 @@ public class UserService {
         LocalDate arrDate = flight.getArrivalDate();
         LocalTime arrTime = flight.getArrivalTime();
 
+        // 3️ Validate passengers and seats
         List<Passenger> passengers = bookingRequest.getPassengers();
 
-        for (int i = 0; i < passengers.size(); i++) {
-            Passenger passenger = passengers.get(i);
-            passenger.setUser(user);
-            passenger = passengerRepo.save(passenger); // save new passenger
+        if (passengers == null || passengers.isEmpty()) {
+            throw new RuntimeException("No passengers provided for booking");
+        }
 
-            // 3️ Check if passenger already booked the same flight
-            boolean bookedSameFlight = bookingRepo
-                    .existsByFlightNumberAndUser_UserIDAndPassengers_Name(
-                            flight.getFlightNumber(),
-                            userId,
-                            passenger.getName()
-                    );
+        for (Passenger passenger : passengers) {
+            // Check seat availability
+            Seat seat = seatRepository.findSeatsByFlightNumber(flight.getFlightNumber()).stream()
+                    .filter(s -> s.getSeatNumber().equalsIgnoreCase(passenger.getSeatNo()))
+                    .findFirst()
+                    .orElseThrow(() -> new RuntimeException("Seat " + passenger.getSeatNo() + " not found on flight"));
 
-            if (bookedSameFlight) {
-                throw new RuntimeException("## Passenger " + passenger.getName() +
-                        " is already booked on flight " + flight.getFlightNumber());
+            if (seat.getSeatStatus() != SeatStatus.AVAILABLE) {
+                throw new RuntimeException("Seat " + passenger.getSeatNo() + " is already booked");
             }
 
-            // 4️ Check overlapping flights using passport number
+            // Check if passenger already booked this flight
+            boolean alreadyBooked = bookingRepo.existsByFlightNumberAndUser_UserIDAndPassengers_Name(
+                    flight.getFlightNumber(), userId, passenger.getName());
+
+            if (alreadyBooked) {
+                throw new RuntimeException("Passenger " + passenger.getName() +
+                        " already booked on flight " + flight.getFlightNumber());
+            }
+
+            // Check for overlapping flight (passport conflict)
             boolean hasConflict = bookingRepo.existsBookingConflictByPassport(
-                    passenger.getPassportNumber(),
-                    depDate,
-                    depTime,
-                    arrDate,
-                    arrTime
-            );
+                    passenger.getPassportNumber(), depDate, depTime, arrDate, arrTime);
 
             if (hasConflict) {
                 throw new RuntimeException("Passenger " + passenger.getName() +
                         " with passport " + passenger.getPassportNumber() +
-                        " already has another flight overlapping between " +
-                        depDate + " " + depTime + " and " +
-                        arrDate + " " + arrTime);
+                        " has another overlapping booking.");
             }
 
-            passengers.set(i, passenger);
+            // ✅ Default passenger values from flight and seat
+            passenger.setTravelClass(seat.getTravelClass());
+            passenger.setSeatType(seat.getSeatType());
+            passenger.setDepartureType(flight.getDepartureType());
+            passenger.setUser(user);
+
+            // Mark seat as booked
+            seat.setSeatStatus(SeatStatus.OCCUPIED);
+            seatRepository.save(seat);
         }
 
-        // 5️ Save booking
-        bookingRequest.setPassengers(passengers);
+        // 4️⃣ Prepare booking details
         bookingRequest.setUser(user);
+        bookingRequest.setPassengers(passengers);
         bookingRequest.setBookingTime(LocalDateTime.now());
-        bookingRequest.setStatus(BookingStatus.CONFIRMED);
         bookingRequest.setPassengerCount(passengers.size());
+        bookingRequest.setStatus(BookingStatus.CONFIRMED);
+        bookingRequest.setJourneyStatus(JourneyStatus.SCHEDULED);
 
-        // 6️ Use flight info to set times in booking
+        // ✅ Default values from flight
+        bookingRequest.setAircraftSize(flight.getAircraftSize());
+        bookingRequest.setTripType(bookingRequest.getTripType());
         bookingRequest.setDepartureDate(depDate);
         bookingRequest.setDepartureTime(depTime);
         bookingRequest.setArrivalDate(arrDate);
         bookingRequest.setArrivalTime(arrTime);
 
+        // Set fare type default (optional)
+        if (bookingRequest.getSpecialFareType() == null) {
+            bookingRequest.setSpecialFareType(SpecialFareType.REGULAR);
+        }
+
+        // 5️⃣ Save booking
         Booking savedBooking = bookingRepo.save(bookingRequest);
 
-        // 7️ Deduct seats from flight
-        int remainingSeats = flight.getAvailableSeats() - savedBooking.getPassengerCount();
+        // 6️⃣ Update flight seat availability
+        int remainingSeats = flight.getAvailableSeats() - passengers.size();
         if (remainingSeats < 0) {
             throw new RuntimeException("Not enough available seats on flight " + flight.getFlightNumber());
         }
@@ -308,6 +332,7 @@ public class UserService {
 
         return savedBooking;
     }
+
 
 
     // Cancel booking

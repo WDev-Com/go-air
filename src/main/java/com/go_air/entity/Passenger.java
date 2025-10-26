@@ -1,7 +1,10 @@
 package com.go_air.entity;
 
+import com.go_air.enums.DepartureType;
 import com.go_air.enums.Gender;
-import com.go_air.enums.SeatPreference;
+import com.go_air.enums.SeatType;
+import com.go_air.enums.TravelClass;
+
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -22,6 +25,8 @@ public class Passenger {
     private Long id;
 
     private String name;
+    
+    private String seatNo;
 
     @Enumerated(EnumType.STRING)
     private Gender gender;
@@ -29,8 +34,14 @@ public class Passenger {
     private int age;
 
     @Enumerated(EnumType.STRING)
-    private SeatPreference seatPreference;
+    private SeatType seatType;
 
+    @Enumerated(EnumType.STRING)
+    private TravelClass travelClass;
+    
+    @Enumerated(EnumType.STRING)
+    private DepartureType departureType;
+    
     private String passportNumber;
 
     @ManyToOne

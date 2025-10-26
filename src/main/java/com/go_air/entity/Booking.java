@@ -6,7 +6,10 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 
+import com.go_air.enums.AircraftSize;
 import com.go_air.enums.BookingStatus;
+import com.go_air.enums.JourneyStatus;
+import com.go_air.enums.SpecialFareType;
 import com.go_air.enums.TripType;
 import jakarta.persistence.*;
 import lombok.*;
@@ -30,6 +33,9 @@ public class Booking {
     private String flightNumber;
 
     @Enumerated(EnumType.STRING)
+    private AircraftSize aircraftSize;
+    
+    @Enumerated(EnumType.STRING)
     private TripType tripType;
 
     private LocalTime departureTime; 
@@ -43,15 +49,24 @@ public class Booking {
     private User user;
 
     private String contactEmail;
+    
     private String contactPhone;
 
     private LocalDateTime bookingTime;
+    
     private int passengerCount;
+    
     private double totalAmount;
 
     @Enumerated(EnumType.STRING)
     private BookingStatus status;
- 
+    
+    @Enumerated(EnumType.STRING)
+    private SpecialFareType specialFareType;
+    
+    @Enumerated(EnumType.STRING)
+    private JourneyStatus journeyStatus;
+    
    // One booking can have multiple passengers
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
     @JoinColumn(name = "booking_id") // foreign key in Passenger table

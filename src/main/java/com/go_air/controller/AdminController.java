@@ -49,6 +49,14 @@ public class AdminController {
         List<Seat> seats = adminService.getSeatsByFlightNumber(flightNumber);
         return ResponseEntity.ok(seats);
     }
+    
+   @PreAuthorize("hasAuthority('ADMIN')")
+   // Get flight by flight number
+   @GetMapping("/flights/{flightNumber}")
+   public ResponseEntity<Flights> getFlightByFlightNo(@PathVariable String flightNumber) {
+      Flights flight = adminService.getFlightByFlightNumber(flightNumber);
+      return (flight != null) ? ResponseEntity.ok(flight) : ResponseEntity.notFound().build();
+   }
 
     @PreAuthorize("hasAuthority('ADMIN')")
     // Create flight
@@ -66,13 +74,7 @@ public class AdminController {
         return ResponseEntity.ok(adminService.getAllFlights());
     }
 
-//    @PreAuthorize("hasAuthority('ADMIN')")
-//    // Get flight by flight number
-//    @GetMapping("/flights/{flightNumber}")
-//    public ResponseEntity<Flights> getFlightByFlightNumber(@PathVariable String flightNumber) {
-//        Flights flight = adminService.getFlightByFlightNumber(flightNumber);
-//        return (flight != null) ? ResponseEntity.ok(flight) : ResponseEntity.notFound().build();
-//    }
+
 
     @PreAuthorize("hasAuthority('ADMIN')")
     // Update flight
