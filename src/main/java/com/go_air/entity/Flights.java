@@ -2,8 +2,13 @@ package com.go_air.entity;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
+import java.util.List;
+
+import com.go_air.enums.AircraftSize;
 import com.go_air.enums.BookingType;
 import com.go_air.enums.DepartureType;
+import com.go_air.enums.JourneyStatus;
+
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -41,16 +46,35 @@ public class Flights {
 
     @Enumerated(EnumType.STRING)
     private DepartureType departureType;
+    
+    @Enumerated(EnumType.STRING)
+    private AircraftSize aircraftSize;
+    
     @Column(name = "departure_date")
     private LocalDate departureDate;
+    
     @Column(columnDefinition = "TIME WITHOUT TIME ZONE")
     private LocalTime departureTime;
-
+    
     private LocalDate arrivalDate;
     @Column(columnDefinition = "TIME WITHOUT TIME ZONE")
     private LocalTime arrivalTime;
 
     private int durationMinutes;
+    
     private Integer price;
+    
     private int availableSeats;
+    
+    @Enumerated(EnumType.STRING)
+    @Column(name = "journey_status", nullable = false, columnDefinition = "varchar(255) default 'SCHEDULED'")
+    @Builder.Default
+    private JourneyStatus journeyStatus = JourneyStatus.SCHEDULED;
+
+
+ 
+    @OneToMany(mappedBy = "flight", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<Seat> seats;
 }
+
+

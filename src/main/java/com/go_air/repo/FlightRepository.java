@@ -51,6 +51,5 @@ public interface FlightRepository extends JpaRepository<Flights, Long> {
             LocalDate departureDate,
             LocalTime departureTime
     );
-    
-    
+ 
 }
