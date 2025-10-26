@@ -5,6 +5,7 @@ import com.go_air.entity.Flights;
 import com.go_air.entity.Passenger;
 import com.go_air.entity.Seat;
 import com.go_air.entity.User;
+import com.go_air.enums.AircraftSize;
 import com.go_air.enums.BookingStatus;
 import com.go_air.enums.BookingType;
 import com.go_air.enums.DepartureType;
@@ -75,6 +76,7 @@ public class UserService {
             Integer minPrice,
             Integer maxPrice,
             Integer passengers,
+            AircraftSize aircraftSize,
             SpecialFareType specialFareType
     ) {
         Map<String, List<Flights>> result = new LinkedHashMap<>();
@@ -118,7 +120,7 @@ public class UserService {
                         getFlightsByFilters(
                                 trimmedAirline, params.src(), params.dest(), params.date(),
                                 stop, bookingType, departureType,
-                                minPrice, adjustedMaxPrice, passengers
+                                minPrice, adjustedMaxPrice, passengers,aircraftSize
                         ),
                         specialFareType,
                         passengers
@@ -207,7 +209,9 @@ public class UserService {
         DepartureType departureType,
         Integer minPrice,
         Integer maxPrice,
-        Integer passengers
+        Integer passengers,
+        AircraftSize aircraftSize
+        
 ) {
     airline = (airline != null && !airline.trim().isEmpty()) ? airline.trim() : null;
     sourceAirport = (sourceAirport != null && !sourceAirport.trim().isEmpty()) ? sourceAirport.trim() : null;
@@ -215,6 +219,7 @@ public class UserService {
 
     String bookingTypeStr = (bookingType != null) ? bookingType.name() : null;
     String departureTypeStr = (departureType != null) ? departureType.name() : null;
+    String aircraftSizeStr = (aircraftSize != null) ? aircraftSize.name() : null;
 
     
     
@@ -228,7 +233,8 @@ public class UserService {
             departureTypeStr,
             minPrice,
             maxPrice,
-            passengers
+            passengers,
+            aircraftSizeStr
     );
     }
 
@@ -251,26 +257,27 @@ public class UserService {
 
         // 3️ Validate passengers and seats
         List<Passenger> passengers = bookingRequest.getPassengers();
-
         if (passengers == null || passengers.isEmpty()) {
             throw new RuntimeException("No passengers provided for booking");
         }
 
+        double totalAmount = 0.0;
+
         for (Passenger passenger : passengers) {
-            // Check seat availability
+            // Find seat by seat number
             Seat seat = seatRepository.findSeatsByFlightNumber(flight.getFlightNumber()).stream()
                     .filter(s -> s.getSeatNumber().equalsIgnoreCase(passenger.getSeatNo()))
                     .findFirst()
                     .orElseThrow(() -> new RuntimeException("Seat " + passenger.getSeatNo() + " not found on flight"));
 
+            // Check seat availability
             if (seat.getSeatStatus() != SeatStatus.AVAILABLE) {
                 throw new RuntimeException("Seat " + passenger.getSeatNo() + " is already booked");
             }
 
-            // Check if passenger already booked this flight
+            // Prevent duplicate booking for same user + flight + passenger
             boolean alreadyBooked = bookingRepo.existsByFlightNumberAndUser_UserIDAndPassengers_Name(
                     flight.getFlightNumber(), userId, passenger.getName());
-
             if (alreadyBooked) {
                 throw new RuntimeException("Passenger " + passenger.getName() +
                         " already booked on flight " + flight.getFlightNumber());
@@ -279,33 +286,66 @@ public class UserService {
             // Check for overlapping flight (passport conflict)
             boolean hasConflict = bookingRepo.existsBookingConflictByPassport(
                     passenger.getPassportNumber(), depDate, depTime, arrDate, arrTime);
-
             if (hasConflict) {
                 throw new RuntimeException("Passenger " + passenger.getName() +
                         " with passport " + passenger.getPassportNumber() +
                         " has another overlapping booking.");
             }
 
-            // ✅ Default passenger values from flight and seat
+            // Assign class/type details
             passenger.setTravelClass(seat.getTravelClass());
             passenger.setSeatType(seat.getSeatType());
             passenger.setDepartureType(flight.getDepartureType());
             passenger.setUser(user);
 
-            // Mark seat as booked
+            // Calculate base fare depending on class
+            double baseFare = flight.getPrice();
+            switch (seat.getTravelClass()) {
+                case PREMIUM_ECONOMY -> baseFare *= 1.3;
+                case BUSINESS -> baseFare *= 1.8;
+                case FIRST -> baseFare *= 2.5;
+                default -> baseFare *= 1.0;
+            }
+            
+            totalAmount += baseFare;
+
+            // Mark seat as occupied
             seat.setSeatStatus(SeatStatus.OCCUPIED);
             seatRepository.save(seat);
         }
 
-        // 4️⃣ Prepare booking details
+        // 4️ Apply special fare discounts
+        SpecialFareType fareType = bookingRequest.getSpecialFareType();
+        if (fareType == null) {
+            fareType = SpecialFareType.REGULAR;
+        }
+
+        // Validate minimum passenger requirement
+        fareType.validatePassengers(passengers.size());
+
+        // Apply fixed discount logic from enum
+        int flightPrice = flight.getPrice() != null ? flight.getPrice() : 10000;
+        int discountedPrice = fareType.applyDiscount(flightPrice);
+        double discountPerPassenger = flightPrice - discountedPrice;
+
+        // Apply total discount
+        double totalDiscount = discountPerPassenger * passengers.size();
+        double finalAmount = totalAmount - totalDiscount;
+
+        // Ensure final amount not below zero
+        if (finalAmount < 0) finalAmount = 0;
+
+        // 5️ Prepare booking
         bookingRequest.setUser(user);
         bookingRequest.setPassengers(passengers);
         bookingRequest.setBookingTime(LocalDateTime.now());
         bookingRequest.setPassengerCount(passengers.size());
         bookingRequest.setStatus(BookingStatus.CONFIRMED);
         bookingRequest.setJourneyStatus(JourneyStatus.SCHEDULED);
+        bookingRequest.setSpecialFareType(fareType);
+        bookingRequest.setTotalAmount(finalAmount);
 
-        // ✅ Default values from flight
+        // Default flight details
         bookingRequest.setAircraftSize(flight.getAircraftSize());
         bookingRequest.setTripType(bookingRequest.getTripType());
         bookingRequest.setDepartureDate(depDate);
@@ -313,15 +353,10 @@ public class UserService {
         bookingRequest.setArrivalDate(arrDate);
         bookingRequest.setArrivalTime(arrTime);
 
-        // Set fare type default (optional)
-        if (bookingRequest.getSpecialFareType() == null) {
-            bookingRequest.setSpecialFareType(SpecialFareType.REGULAR);
-        }
-
-        // 5️⃣ Save booking
+        // 6️ Save booking
         Booking savedBooking = bookingRepo.save(bookingRequest);
 
-        // 6️⃣ Update flight seat availability
+        // 7️ Update available seats
         int remainingSeats = flight.getAvailableSeats() - passengers.size();
         if (remainingSeats < 0) {
             throw new RuntimeException("Not enough available seats on flight " + flight.getFlightNumber());
@@ -332,6 +367,8 @@ public class UserService {
 
         return savedBooking;
     }
+
+
 
 
 
@@ -357,81 +394,125 @@ public class UserService {
                         .age(p.getAge())
                         .build())
                 .collect(Collectors.toList());
+        
+    // Generate Tickets By User
     }
 
    // Get Tickets 
     public List<PassengerTicketDTO> generateTicketsByUser(String userId) {
-    List<Booking> bookings = bookingRepo.findByUser_UserID(userId);
-    List<PassengerTicketDTO> tickets = new ArrayList<>();
+        List<Booking> userBookings = bookingRepo.findByUser_UserID(userId);
+        List<PassengerTicketDTO> tickets = new ArrayList<>();
 
-    for (Booking b : bookings) {
-        Flights flight = adminService.getFlightByFlightNumber(b.getFlightNumber());
+        for (Booking booking : userBookings) {
+            Flights flight = adminService.getFlightByFlightNumber(booking.getFlightNumber());
 
-        for (Passenger p : b.getPassengers()) {
-            tickets.add(PassengerTicketDTO.builder()
-                    .ticketId(b.getId())
-                    .flightNumber(b.getFlightNumber())
-                    .tripType(b.getTripType())
+            for (Passenger passenger : booking.getPassengers()) {
+                PassengerTicketDTO ticket = PassengerTicketDTO.builder()
+                        .ticketId(booking.getId())
+                        .userId(userId)
+                        .flightNumber(booking.getFlightNumber())
+                        .tripType(booking.getTripType())
+                        .specialFareType(booking.getSpecialFareType())
+                        .journeyStatus(booking.getJourneyStatus())
+                        .bookingStatus(booking.getStatus())
+                        .bookingTime(booking.getBookingTime())
+                        .aircraftSize(booking.getAircraftSize())
+                        .passengerCount(booking.getPassengerCount())
+                        .totalAmount(booking.getPassengerCount() > 0
+                                ? booking.getTotalAmount() / booking.getPassengerCount()
+                                : booking.getTotalAmount())
 
-                    // Use flight info if available, else booking info
-                    .departureDate(flight != null && flight.getDepartureDate() != null
-                            ? flight.getDepartureDate()
-                            : b.getDepartureDate())
-                    .departureTime(flight != null && flight.getDepartureTime() != null
-                            ? flight.getDepartureTime()
-                            : b.getDepartureTime())
-                    .arrivalDate(flight != null && flight.getArrivalDate() != null
-                            ? flight.getArrivalDate()
-                            : b.getArrivalDate())
-                    .arrivalTime(flight != null && flight.getArrivalTime() != null
-                            ? flight.getArrivalTime()
-                            : b.getArrivalTime())
+                        // Flight info
+                        .airline(flight != null ? flight.getAirline() : null)
+                        .sourceAirport(flight != null ? flight.getSourceAirport() : null)
+                        .destinationAirport(flight != null ? flight.getDestinationAirport() : null)
+                        .departureDate(flight != null ? flight.getDepartureDate() : booking.getDepartureDate())
+                        .departureTime(flight != null ? flight.getDepartureTime() : booking.getDepartureTime())
+                        .arrivalDate(flight != null ? flight.getArrivalDate() : booking.getArrivalDate())
+                        .arrivalTime(flight != null ? flight.getArrivalTime() : booking.getArrivalTime())
+                        .stop(flight != null ? flight.getStop() : null)
+                        .destinationStop(flight != null ? flight.getDestinationStop() : null)
+                        .bookingType(flight != null ? flight.getBookingType() : null)
+                        .departureType(flight != null ? flight.getDepartureType() : null)
+                        .durationMinutes(flight != null ? flight.getDurationMinutes() : null)
+                        .price(flight != null ? flight.getPrice() : null)
 
-                    // Flight details
-                    .sourceAirport(flight != null ? flight.getSourceAirport() : null)
-                    .destinationAirport(flight != null ? flight.getDestinationAirport() : null)
-                    .stop(flight != null ? flight.getStop() : null)
-                    .destinationStop(flight != null ? flight.getDestinationStop() : null)
-                    .bookingType(flight != null ? flight.getBookingType() : null)
-                    .departureType(flight != null ? flight.getDepartureType() : null)
-                    .durationMinutes(flight != null ? flight.getDurationMinutes() : null)
+                        // Passenger info
+                        .passengerName(passenger.getName())
+                        .gender(passenger.getGender() != null ? passenger.getGender().toString() : null)
+                        .age(passenger.getAge())
+                        .passportNumber(passenger.getPassportNumber())
+                        .seatNo(passenger.getSeatNo())
+                        .seatType(passenger.getSeatType())
+                        .travelClass(passenger.getTravelClass())
+                        .build();
 
-                    // Booking info
-                    .totalAmount(b.getPassengerCount() > 0 ? b.getTotalAmount() / b.getPassengerCount() : b.getTotalAmount())
-                    .status(b.getStatus())
-
-                    // Passenger info
-                    .passengerName(p.getName())
-                    .gender(p.getGender() != null ? p.getGender().toString() : null)
-                    .age(p.getAge())
-                    .build());
+                tickets.add(ticket);
+            }
         }
+
+        return tickets;
     }
 
-    return tickets;
-}
 
     //By Booking ID Update this function TO_DO
     public List<BookingResponseDTO> getBookingsByUser(String userId) {
-        return bookingRepo.findByUser_UserID(userId)
-                .stream()
-                .map((Booking b) -> BookingResponseDTO.builder()
-                        .id(b.getId())
-                        .flightNumber(b.getFlightNumber())
-                        .tripType(b.getTripType())
-                        .departureDate(b.getDepartureDate())
-                        .departureTime(b.getDepartureTime())
-                        .arrivalDate(b.getArrivalDate())
-                        .arrivalTime(b.getArrivalTime())
-                        .bookingTime(b.getBookingTime())
-                        .passengerCount(b.getPassengerCount())
-                        .totalAmount(b.getTotalAmount())
-                        .status(b.getStatus())
-                        .passengers(mapPassengers(b.getPassengers()))
-                        .build())
+        List<Booking> userBookings = bookingRepo.findByUser_UserID(userId);
+
+        return userBookings.stream()
+                .map((Booking booking) -> {
+                    Flights flight = adminService.getFlightByFlightNumber(booking.getFlightNumber());
+
+                    // Map passengers explicitly
+                    List<PassengerResponseDTO> passengerDTOs = booking.getPassengers().stream()
+                            .map((Passenger p) -> PassengerResponseDTO.builder()
+                                    .passengerId(p.getId())
+                                    .name(p.getName())
+                                    .age(p.getAge())
+                                    .gender(p.getGender())
+                                    .passportNumber(p.getPassportNumber())
+                                    .seatNo(p.getSeatNo())
+                                    .seatType(p.getSeatType())
+                                    .travelClass(p.getTravelClass())
+                                    .departureType(p.getDepartureType())
+                                    .build())
+                            .collect(Collectors.toList());
+
+                    return BookingResponseDTO.builder()
+                            .id(booking.getId())
+                            .flightNumber(booking.getFlightNumber())
+                            .tripType(booking.getTripType())
+                            .aircraftSize(booking.getAircraftSize())
+                            .specialFareType(booking.getSpecialFareType())
+                            .journeyStatus(booking.getJourneyStatus())
+                            .status(booking.getStatus())
+                            .bookingTime(booking.getBookingTime())
+                            .passengerCount(booking.getPassengerCount())
+                            .totalAmount(booking.getTotalAmount())
+
+                            // Flight info
+                            .airline(flight != null ? flight.getAirline() : null)
+                            .sourceAirport(flight != null ? flight.getSourceAirport() : null)
+                            .destinationAirport(flight != null ? flight.getDestinationAirport() : null)
+                            .departureDate(flight != null ? flight.getDepartureDate() : booking.getDepartureDate())
+                            .departureTime(flight != null ? flight.getDepartureTime() : booking.getDepartureTime())
+                            .arrivalDate(flight != null ? flight.getArrivalDate() : booking.getArrivalDate())
+                            .arrivalTime(flight != null ? flight.getArrivalTime() : booking.getArrivalTime())
+                            .stop(flight != null ? flight.getStop() : null)
+                            .destinationStop(flight != null ? flight.getDestinationStop() : null)
+                            .bookingType(flight != null ? flight.getBookingType() : null)
+                            .departureType(flight != null ? flight.getDepartureType() : null)
+                            .durationMinutes(flight != null ? flight.getDurationMinutes() : null)
+                            .price(flight != null ? flight.getPrice() : null)
+
+                            // Passengers
+                            .passengers(passengerDTOs)
+                            .build();
+                })
                 .collect(Collectors.toList());
     }
 
+    
     // Create user with only username and password
     public User createUser(User user) {
         if (userRepository.existsByUsername(user.getUsername())) {

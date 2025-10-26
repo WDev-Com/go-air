@@ -50,6 +50,8 @@ public class Flights {
     @Enumerated(EnumType.STRING)
     private AircraftSize aircraftSize;
     
+    private LocalTime boardingTime;
+    
     @Column(name = "departure_date")
     private LocalDate departureDate;
     

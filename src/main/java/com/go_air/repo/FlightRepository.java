@@ -27,7 +27,8 @@ public interface FlightRepository extends JpaRepository<Flights, Long> {
 			    f.departure_type = COALESCE(:departureType, f.departure_type) AND
 			    f.price >= COALESCE(:minPrice, f.price) AND
 			    f.price <= COALESCE(:maxPrice, f.price) AND
-			    f.available_seats >= COALESCE(:passengers, f.available_seats)
+			    f.available_seats >= COALESCE(:passengers, f.available_seats) AND
+			    f.aircraft_size = COALESCE(:aircraftSize, f.aircraft_size)
 			""", nativeQuery = true)
 	    List<Flights> findFlightsByFilters(
 	            @Param("airline") String airline,
@@ -39,7 +40,8 @@ public interface FlightRepository extends JpaRepository<Flights, Long> {
 	            @Param("departureType") String departureType,
 	            @Param("minPrice") Integer minPrice,
 	            @Param("maxPrice") Integer maxPrice,
-	            @Param("passengers") Integer passengers
+	            @Param("passengers") Integer passengers,
+	            @Param("aircraftSize") String aircraftSize
 	    );
 
 

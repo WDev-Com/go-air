@@ -4,6 +4,7 @@ import com.go_air.aop.ValidateFlightData;
 import com.go_air.entity.Booking;
 import com.go_air.entity.Flights;
 import com.go_air.entity.User;
+import com.go_air.enums.AircraftSize;
 import com.go_air.enums.BookingType;
 import com.go_air.enums.DepartureType;
 import com.go_air.enums.SpecialFareType;
@@ -41,6 +42,7 @@ public class UserController {
             @RequestParam(required = false) Integer minPrice,
             @RequestParam(required = false) Integer maxPrice,
             @RequestParam(required = false) Integer passengers,
+            @RequestParam(required = false) AircraftSize aircraftSize,
             @RequestParam(required = false) SpecialFareType specialFareType //enum param
     ) {
 
@@ -78,6 +80,7 @@ public class UserController {
                 minPrice,
                 maxPrice,
                 passengers,
+                aircraftSize,
                 specialFareType
         );
 
@@ -98,7 +101,8 @@ public class UserController {
             @RequestParam(required = false) DepartureType departureType,
             @RequestParam(required = false) Integer minPrice,
             @RequestParam(required = false) Integer maxPrice,
-            @RequestParam(required = false) Integer passengers
+            @RequestParam(required = false) Integer passengers,
+            @RequestParam(required = false) AircraftSize aircraftSize
     ) {
         LocalDate departureDate = null;
         if (departureDateStr != null && !departureDateStr.trim().isEmpty()) {
@@ -107,7 +111,7 @@ public class UserController {
         
         List<Flights> flights = userService.getFlightsByFilters(
                 airline, sourceAirport, destinationAirport, departureDate, stop,
-                bookingType, departureType, minPrice, maxPrice, passengers
+                bookingType, departureType, minPrice, maxPrice, passengers,aircraftSize
         );
         return ResponseEntity.ok(flights);
     }
