@@ -16,33 +16,34 @@ public interface FlightRepository extends JpaRepository<Flights, Long> {
 	Optional<Flights> findByFlightNumber(String flightNumber);
 
 	@Query(value = """
-			SELECT * FROM flights f
-			WHERE
-			    f.airline = COALESCE(:airline, f.airline) AND
-			    f.source_airport = COALESCE(:sourceAirport, f.source_airport) AND
-			    f.destination_airport = COALESCE(:destinationAirport, f.destination_airport) AND
-			    f.departure_date = COALESCE(:departureDate, f.departure_date) AND
-			    f.stop = COALESCE(:stop, f.stop) AND
-			    f.booking_type = COALESCE(:bookingType, f.booking_type) AND
-			    f.departure_type = COALESCE(:departureType, f.departure_type) AND
-			    f.price >= COALESCE(:minPrice, f.price) AND
-			    f.price <= COALESCE(:maxPrice, f.price) AND
-			    f.available_seats >= COALESCE(:passengers, f.available_seats) AND
-			    f.aircraft_size = COALESCE(:aircraftSize, f.aircraft_size)
-			""", nativeQuery = true)
-	    List<Flights> findFlightsByFilters(
-	            @Param("airline") String airline,
-	            @Param("sourceAirport") String sourceAirport,
-	            @Param("destinationAirport") String destinationAirport,
-	            @Param("departureDate") LocalDate departureDate,
-	            @Param("stop") Integer stop,
-	            @Param("bookingType") String bookingType,
-	            @Param("departureType") String departureType,
-	            @Param("minPrice") Integer minPrice,
-	            @Param("maxPrice") Integer maxPrice,
-	            @Param("passengers") Integer passengers,
-	            @Param("aircraftSize") String aircraftSize
-	    );
+		    SELECT * FROM flights f
+		    WHERE
+		        (:airlines IS NULL OR f.airline IN (:airlines)) AND
+		        f.source_airport = COALESCE(:sourceAirport, f.source_airport) AND
+		        f.destination_airport = COALESCE(:destinationAirport, f.destination_airport) AND
+		        f.departure_date = COALESCE(:departureDate, f.departure_date) AND
+		        f.stop = COALESCE(:stop, f.stop) AND
+		        f.booking_type = COALESCE(:bookingType, f.booking_type) AND
+		        f.departure_type = COALESCE(:departureType, f.departure_type) AND
+		        f.price >= COALESCE(:minPrice, f.price) AND
+		        f.price <= COALESCE(:maxPrice, f.price) AND
+		        f.available_seats >= COALESCE(:passengers, f.available_seats) AND
+		        f.aircraft_size = COALESCE(:aircraftSize, f.aircraft_size)
+		""", nativeQuery = true)
+		List<Flights> findFlightsByFilters(
+		    @Param("airlines") List<String> airlines,
+		    @Param("sourceAirport") String sourceAirport,
+		    @Param("destinationAirport") String destinationAirport,
+		    @Param("departureDate") LocalDate departureDate,
+		    @Param("stop") Integer stop,
+		    @Param("bookingType") String bookingType,
+		    @Param("departureType") String departureType,
+		    @Param("minPrice") Integer minPrice,
+		    @Param("maxPrice") Integer maxPrice,
+		    @Param("passengers") Integer passengers,
+		    @Param("aircraftSize") String aircraftSize
+		);
+
 
 
 

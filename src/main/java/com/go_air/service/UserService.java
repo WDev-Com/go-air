@@ -33,10 +33,12 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -66,10 +68,11 @@ public class UserService {
     
     public Map<String, List<Flights>> searchFlightsByTripType(
             TripType tripType,
-            String airline,
+            List<String> airlines,
             List<String> sourceAirports,
             List<String> destinationAirports,
             List<LocalDate> departureDates, // <-- accepts as String list
+            LocalDate retDate,
             Integer stop,
             BookingType bookingType,
             DepartureType departureType,
@@ -86,7 +89,9 @@ public class UserService {
             throw new IllegalArgumentException("Source and destination airports must not be empty for the selected trip type.");
         }
 
-        final String trimmedAirline = (airline != null && !airline.trim().isEmpty()) ? airline.trim() : null;
+        List<String> validAirlines = (airlines != null)
+                ? airlines.stream().map(String::trim).filter(s -> !s.isEmpty()).toList()
+                : List.of();
 
         // Clean source & destination lists
         List<String> validSources = sourceAirports.stream()
@@ -118,7 +123,7 @@ public class UserService {
         Function<FlightParams, List<Flights>> fetchAndDiscount = params ->
                 applyPostFareDiscount(
                         getFlightsByFilters(
-                                trimmedAirline, params.src(), params.dest(), params.date(),
+                        		validAirlines, params.src(), params.dest(), params.date(),
                                 stop, bookingType, departureType,
                                 minPrice, adjustedMaxPrice, passengers,aircraftSize
                         ),
@@ -141,29 +146,40 @@ public class UserService {
                 String forwardKey = validSources.get(0) + "_" + validDestinations.get(0);
                 String returnKey = validDestinations.get(0) + "_" + validSources.get(0);
 
+                // Forward flight search
                 result.put(forwardKey, fetchAndDiscount.apply(new FlightParams(
                         validSources.get(0),
                         validDestinations.get(0),
                         departureDates.get(0)
                 )));
 
-             // Return flight should be on the next day
+                // Determine return date
                 LocalDate returnDate;
-                if (departureDates.size() > 1) {
-                    // If user provided both dates, use the second one
-                    returnDate = departureDates.get(1);
+                if (retDate != null) {
+                    // User provided both dates
+                    returnDate = retDate;
                 } else {
-                    // Otherwise, automatically set as next day
+                    // Default to next day if return date not provided
                     returnDate = departureDates.get(0).plusDays(1);
                 }
 
-                result.put(returnKey, fetchAndDiscount.apply(new FlightParams(
+                // Fetch return flights
+                var returnFlights = fetchAndDiscount.apply(new FlightParams(
                         validDestinations.get(0),
                         validSources.get(0),
                         returnDate
-                )));
-            }
+                ));
 
+                // If no flights found, throw an exception
+                if (returnFlights == null || returnFlights.isEmpty()) {
+                    throw new RuntimeException("Flight not available for return date: " + returnDate);
+                }
+
+                // Otherwise, store results
+                result.put(returnKey, returnFlights);
+            }
+        
+      
             case MULTI_CITY -> {
                 int trips = Math.min(
                         Math.min(validSources.size(), validDestinations.size()),
@@ -200,7 +216,7 @@ public class UserService {
     }
 
     public List<Flights> getFlightsByFilters(
-        String airline,
+        List<String> airlines,
         String sourceAirport,
         String destinationAirport,
         LocalDate departureDate,
@@ -213,7 +229,7 @@ public class UserService {
         AircraftSize aircraftSize
         
 ) {
-    airline = (airline != null && !airline.trim().isEmpty()) ? airline.trim() : null;
+   
     sourceAirport = (sourceAirport != null && !sourceAirport.trim().isEmpty()) ? sourceAirport.trim() : null;
     destinationAirport = (destinationAirport != null && !destinationAirport.trim().isEmpty()) ? destinationAirport.trim() : null;
 
@@ -221,10 +237,14 @@ public class UserService {
     String departureTypeStr = (departureType != null) ? departureType.name() : null;
     String aircraftSizeStr = (aircraftSize != null) ? aircraftSize.name() : null;
 
+    List<String> validAirlines = (airlines != null)
+            ? airlines.stream().map(String::trim).filter(s -> !s.isEmpty()).toList()
+            : List.of();
+
     
     
     return flightRepository.findFlightsByFilters(
-            airline,
+    		validAirlines,
             sourceAirport,
             destinationAirport,
             departureDate,
@@ -449,6 +469,71 @@ public class UserService {
 
                 tickets.add(ticket);
             }
+        }
+
+        return tickets;
+    }
+
+    public List<PassengerTicketDTO> generateTicketsByUserAndBooking(String userId, Long bookingId) {
+        // Get the specific booking for the user
+        Optional<Booking> bookingOpt = bookingRepo.findById(bookingId);
+
+        if (bookingOpt.isEmpty()) {
+            return Collections.emptyList(); // or throw custom exception
+        }
+
+        Booking booking = bookingOpt.get();
+
+        // Ensure this booking belongs to the given user
+        if (!booking.getUser().getUserID().equals(userId)) {
+            return Collections.emptyList(); // or throw UnauthorizedException
+        }
+
+        Flights flight = adminService.getFlightByFlightNumber(booking.getFlightNumber());
+        List<PassengerTicketDTO> tickets = new ArrayList<>();
+
+        for (Passenger passenger : booking.getPassengers()) {
+            PassengerTicketDTO ticket = PassengerTicketDTO.builder()
+                    .ticketId(booking.getId())
+                    .userId(userId)
+                    .flightNumber(booking.getFlightNumber())
+                    .tripType(booking.getTripType())
+                    .specialFareType(booking.getSpecialFareType())
+                    .journeyStatus(booking.getJourneyStatus())
+                    .bookingStatus(booking.getStatus())
+                    .bookingTime(booking.getBookingTime())
+                    .aircraftSize(booking.getAircraftSize())
+                    .passengerCount(booking.getPassengerCount())
+                    .totalAmount(booking.getPassengerCount() > 0
+                            ? booking.getTotalAmount() / booking.getPassengerCount()
+                            : booking.getTotalAmount())
+
+                    // Flight info
+                    .airline(flight != null ? flight.getAirline() : null)
+                    .sourceAirport(flight != null ? flight.getSourceAirport() : null)
+                    .destinationAirport(flight != null ? flight.getDestinationAirport() : null)
+                    .departureDate(flight != null ? flight.getDepartureDate() : booking.getDepartureDate())
+                    .departureTime(flight != null ? flight.getDepartureTime() : booking.getDepartureTime())
+                    .arrivalDate(flight != null ? flight.getArrivalDate() : booking.getArrivalDate())
+                    .arrivalTime(flight != null ? flight.getArrivalTime() : booking.getArrivalTime())
+                    .stop(flight != null ? flight.getStop() : null)
+                    .destinationStop(flight != null ? flight.getDestinationStop() : null)
+                    .bookingType(flight != null ? flight.getBookingType() : null)
+                    .departureType(flight != null ? flight.getDepartureType() : null)
+                    .durationMinutes(flight != null ? flight.getDurationMinutes() : null)
+                    .price(flight != null ? flight.getPrice() : null)
+
+                    // Passenger info
+                    .passengerName(passenger.getName())
+                    .gender(passenger.getGender() != null ? passenger.getGender().toString() : null)
+                    .age(passenger.getAge())
+                    .passportNumber(passenger.getPassportNumber())
+                    .seatNo(passenger.getSeatNo())
+                    .seatType(passenger.getSeatType())
+                    .travelClass(passenger.getTravelClass())
+                    .build();
+
+            tickets.add(ticket);
         }
 
         return tickets;

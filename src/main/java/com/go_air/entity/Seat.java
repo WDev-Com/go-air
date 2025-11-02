@@ -1,5 +1,7 @@
 package com.go_air.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.go_air.enums.SeatPosition;
 import com.go_air.enums.SeatStatus;
 import com.go_air.enums.SeatType;
@@ -42,5 +44,6 @@ public class Seat {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "flight_number",referencedColumnName = "flightNumber", nullable = false)
+    @JsonIgnore
     private Flights flight;
 }

@@ -9,6 +9,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 @Getter
 @Setter
 @NoArgsConstructor
@@ -36,9 +37,11 @@ public class User implements UserDetails{
     private String role;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL,fetch = FetchType.LAZY)
+    @JsonIgnore
     private List<Passenger> passengers;
-
+    
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL,fetch = FetchType.LAZY)
+    @JsonIgnore
     private List<Booking> bookings;
     
     @OneToOne(mappedBy = "user")

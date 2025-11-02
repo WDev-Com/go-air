@@ -1,5 +1,8 @@
 package com.go_air.entity;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.go_air.enums.DepartureType;
 import com.go_air.enums.Gender;
 import com.go_air.enums.SeatType;
@@ -27,6 +30,11 @@ public class Passenger {
     private String name;
     
     private String seatNo;
+    
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "booking_id")
+    @JsonBackReference("booking-passenger")
+    private Booking booking;
 
     @Enumerated(EnumType.STRING)
     private Gender gender;
@@ -46,5 +54,6 @@ public class Passenger {
 
     @ManyToOne
     @JoinColumn(name = "user_id")
+    @JsonIgnore
     private User user;
 }

@@ -4,6 +4,8 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.go_air.enums.AircraftSize;
 import com.go_air.enums.BookingType;
 import com.go_air.enums.DepartureType;
@@ -17,7 +19,7 @@ import lombok.*;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@ToString
+@ToString(exclude = "seats")
 @Entity
 @Table(
     name = "flights",
@@ -76,6 +78,7 @@ public class Flights {
 
  
     @OneToMany(mappedBy = "flight", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JsonIgnore
     private List<Seat> seats;
 }
 

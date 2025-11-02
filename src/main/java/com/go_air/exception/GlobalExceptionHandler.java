@@ -18,8 +18,12 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+	private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
 	
 	// Handles Spring-wrapped database integrity violations
@@ -106,9 +110,11 @@ public class GlobalExceptionHandler {
     // Handle runtime exceptions from services
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<Map<String, Object>> handleRuntimeException(RuntimeException ex) {
-        Map<String, Object> response = new HashMap<>();
+    	logger.warn("Line No 113 GEH : RuntimeException caught: {}", ex.getMessage());
+    	
+    	Map<String, Object> response = new HashMap<>();
         response.put("status", "FAILED");
-        response.put("message ", "Runtime Exception : "+ex.getMessage());
+        response.put("message", "Runtime Exception : "+ex.getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 

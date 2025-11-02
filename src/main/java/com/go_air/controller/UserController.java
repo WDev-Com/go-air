@@ -22,6 +22,7 @@ import java.util.*;
 
 
 @RestController
+@CrossOrigin("*")
 @RequestMapping("/user")
 public class UserController {
 
@@ -32,10 +33,11 @@ public class UserController {
     @ValidateFlightData
     public ResponseEntity<?> searchFlights(
             @RequestParam TripType tripType,
-            @RequestParam(required = false) String airline,
+            @RequestParam(required = false) List<String> airlines,
             @RequestParam String sourceAirports,       // comma-separated
             @RequestParam String destinationAirports,  // comma-separated
             @RequestParam(required = false) String departureDates, // comma-separated
+            @RequestParam(required = false) String returnDate,
             @RequestParam(required = false) Integer stop,
             @RequestParam(required = false) BookingType bookingType,
             @RequestParam(required = false) DepartureType departureType,
@@ -64,16 +66,25 @@ public class UserController {
                 .filter(s -> !s.isEmpty())
                 .map(s -> LocalDate.parse(s, formatter))
                 .toList();
+        
+        LocalDate retDate = null;
+        if (returnDate != null && !returnDate.isEmpty()) {
+            retDate = LocalDate.parse(returnDate, DateTimeFormatter.ISO_DATE);           
+        }
       
-        airline = (airline != null && !airline.trim().isEmpty()) ? airline.trim() : null;
+     // Clean airline list
+        List<String> validAirlines = (airlines != null)
+                ? airlines.stream().map(String::trim).filter(s -> !s.isEmpty()).toList()
+                : List.of();
 
         // Call service method
         Map<String, List<Flights>> flights = userService.searchFlightsByTripType(
                 tripType,
-                airline,
+                validAirlines,
                 sources,
                 destinations,
                 dates,
+                retDate,
                 stop,
                 bookingType,
                 departureType,
@@ -92,7 +103,7 @@ public class UserController {
     @GetMapping("/flights")
     @ValidateFlightData
     public ResponseEntity<List<Flights>> getFlightsByFilters(
-            @RequestParam(required = false) String airline,
+    		@RequestParam(required = false) List<String> airlines,
             @RequestParam(required = false) String sourceAirport,
             @RequestParam(required = false) String destinationAirport,
             @RequestParam(required = false) String departureDateStr, 
@@ -109,8 +120,14 @@ public class UserController {
             departureDate = LocalDate.parse(departureDateStr.trim());
         }
         
+     // Clean airline list
+        List<String> validAirlines = (airlines != null)
+                ? airlines.stream().map(String::trim).filter(s -> !s.isEmpty()).toList()
+                : List.of();
+
+        
         List<Flights> flights = userService.getFlightsByFilters(
-                airline, sourceAirport, destinationAirport, departureDate, stop,
+        		validAirlines, sourceAirport, destinationAirport, departureDate, stop,
                 bookingType, departureType, minPrice, maxPrice, passengers,aircraftSize
         );
         return ResponseEntity.ok(flights);
@@ -143,6 +160,17 @@ public class UserController {
         List<PassengerTicketDTO> tickets = userService.generateTicketsByUser(userId);
         return ResponseEntity.ok(tickets);
     }
+    
+    // Get Ticket by userId and bookingId
+    @GetMapping("/tickets/{userId}/{bookingId}")
+    public ResponseEntity<List<PassengerTicketDTO>> getPassengerTicketsByBooking(
+            @PathVariable String userId,
+            @PathVariable Long bookingId) {
+
+        List<PassengerTicketDTO> tickets = userService.generateTicketsByUserAndBooking(userId, bookingId);
+        return ResponseEntity.ok(tickets);
+    }
+
     
     // Get all bookings for a user
     @GetMapping("/bookings/{userId}")
@@ -179,6 +207,20 @@ public class UserController {
             return ResponseEntity.ok(user);
         } else {
             return ResponseEntity.notFound().build();
+        }
+    }
+    
+    // Get user by username
+    @GetMapping("/username/{username}")
+    public ResponseEntity<?> getUserByUsername(@PathVariable String username) {
+        try {
+            User user = userService.findByUserName(username);
+            if (user == null) {
+                return ResponseEntity.status(404).body("User not found");
+            }
+            return ResponseEntity.ok(user);
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Error fetching user: " + e.getMessage());
         }
     }
 

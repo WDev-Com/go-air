@@ -42,15 +42,19 @@ class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(
+                		 "/auth/**",
                 		"/auth/login",
                         "/auth/user",
                         "/auth/checkusername",
                         "/auth/signup",                         
                         "/auth/adduser",
-                        "/auth/refreshToken"
+                        "/auth/refreshToken",
+                        "/user/**",
+                        "/admin/**"
+                       
                 ).permitAll()
-                .requestMatchers("/admin/**").hasAuthority("ADMIN")
-                .anyRequest().authenticated()
+//                .requestMatchers("/admin/**").hasAuthority("ADMIN")
+//                .anyRequest().authenticated()
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtEntryPoint))
@@ -72,9 +76,11 @@ class SecurityConfig {
 
     @Bean
     UrlBasedCorsConfigurationSource corsConfigurationSource() {
+    	
         CorsConfiguration corsConfig = new CorsConfiguration();
-        corsConfig.setAllowedOrigins(List.of("*")); // Change "*" to your frontend domain in production
-        corsConfig.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        corsConfig.setAllowedOrigins(List.of("http://localhost:5173"));
+//        corsConfig.setAllowedOrigins(List.of("*")); // Change "*" to your frontend domain in production
+        corsConfig.setAllowedMethods(List.of("GET", "POST", "PATCH","PUT", "DELETE", "OPTIONS"));
         corsConfig.setAllowedHeaders(List.of("Authorization", "Content-Type"));
         corsConfig.setAllowCredentials(true);
         corsConfig.setMaxAge(3600L);

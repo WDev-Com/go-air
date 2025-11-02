@@ -6,6 +6,9 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.go_air.enums.AircraftSize;
 import com.go_air.enums.BookingStatus;
 import com.go_air.enums.JourneyStatus;
@@ -46,6 +49,7 @@ public class Booking {
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
+    @JsonIgnore
     private User user;
 
     private String contactEmail;
@@ -70,5 +74,6 @@ public class Booking {
    // One booking can have multiple passengers
     @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
     @JoinColumn(name = "booking_id") // foreign key in Passenger table
+    @JsonBackReference("booking-passenger")
     private List<Passenger> passengers;
 }
