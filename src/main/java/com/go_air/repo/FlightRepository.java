@@ -1,6 +1,10 @@
 package com.go_air.repo;
 
 import com.go_air.entity.Flights;
+import com.go_air.enums.AircraftSize;
+import com.go_air.enums.BookingType;
+import com.go_air.enums.DepartureType;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -44,8 +48,58 @@ public interface FlightRepository extends JpaRepository<Flights, Long> {
 		    @Param("aircraftSize") String aircraftSize
 		);
 
+        // For Admin
+	@Query("""
+		    SELECT f FROM Flights f
+		    WHERE (:stop IS NULL OR f.stop = :stop)
+		      AND (:minPrice IS NULL OR f.price >= :minPrice)
+		      AND (:maxPrice IS NULL OR f.price <= :maxPrice)
+		      AND (:aircraftSize IS NULL OR f.aircraftSize = :aircraftSize)
+		      AND (:bookingType IS NULL OR f.bookingType = :bookingType)
+		      AND (:departureType IS NULL OR f.departureType = :departureType)
+		      AND (:sourceAirport IS NULL OR f.sourceAirport = :sourceAirport)
+		      AND (:destinationAirport IS NULL OR f.destinationAirport = :destinationAirport)
+		      AND (:departureDate IS NULL OR f.departureDate = :departureDate)
+		      AND (:airlines IS NULL OR f.airline IN :airlines)
+		""")
+		List<Flights> findFlightsByOptionalFilters(
+		    @Param("airlines") List<String> airlines,
+		    @Param("sourceAirport") String sourceAirport,
+		    @Param("destinationAirport") String destinationAirport,
+		    @Param("departureDate") LocalDate departureDate,
+		    @Param("stop") Integer stop,
+		    @Param("bookingType") BookingType bookingType,       // ✅ enum
+		    @Param("departureType") DepartureType departureType, // ✅ enum
+		    @Param("minPrice") Integer minPrice,
+		    @Param("maxPrice") Integer maxPrice,
+		    @Param("aircraftSize") AircraftSize aircraftSize     // ✅ enum
+		);
 
-
+//	 @Query("""
+//		        SELECT f FROM Flights f
+//		        WHERE (:stop IS NULL OR f.stop = :stop)
+//		          AND (:minPrice IS NULL OR f.price >= :minPrice)
+//		          AND (:maxPrice IS NULL OR f.price <= :maxPrice)
+//		          AND (:aircraftSize IS NULL OR f.aircraftSize = :aircraftSize)
+//		          AND (:bookingType IS NULL OR f.bookingType = :bookingType)
+//		          AND (:departureType IS NULL OR f.departureType = :departureType)
+//		          AND (:sourceAirport IS NULL OR f.sourceAirport = :sourceAirport)
+//		          AND (:destinationAirport IS NULL OR f.destinationAirport = :destinationAirport)
+//		          AND (:departureDate IS NULL OR f.departureDate = :departureDate)
+//		          AND (:airlines IS NULL OR f.airline IN :airlines)
+//		    """)
+//		    List<Flights> findFlightsByOptionalFilters(
+//		        @Param("airlines") List<String> airlines,
+//		        @Param("sourceAirport") String sourceAirport,
+//		        @Param("destinationAirport") String destinationAirport,
+//		        @Param("departureDate") LocalDate departureDate,
+//		        @Param("stop") Integer stop,
+//		        @Param("bookingType") String bookingType,
+//		        @Param("departureType") String departureType,
+//		        @Param("minPrice") Integer minPrice,
+//		        @Param("maxPrice") Integer maxPrice,
+//		        @Param("aircraftSize") String aircraftSize
+//		    );
 
 	
     // prevent duplicate flights

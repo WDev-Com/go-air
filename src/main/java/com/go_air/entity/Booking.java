@@ -32,6 +32,8 @@ public class Booking {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+    
+    private String bookingNo;
 
     private String flightNumber;
 

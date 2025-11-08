@@ -7,5 +7,5 @@ public enum TravelClass {
     ECONOMY,
     PREMIUM_ECONOMY,
     BUSINESS,
-    FIRST
+    FIRST_CLASS
 }

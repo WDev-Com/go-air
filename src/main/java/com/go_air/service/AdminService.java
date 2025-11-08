@@ -3,25 +3,34 @@ package com.go_air.service;
 import com.go_air.entity.Flights;
 import com.go_air.entity.Seat;
 import com.go_air.enums.AircraftSize;
+import com.go_air.enums.BookingType;
+import com.go_air.enums.DepartureType;
 import com.go_air.enums.JourneyStatus;
 import com.go_air.enums.SeatOperationStatus;
 import com.go_air.enums.SeatPosition;
 import com.go_air.enums.SeatStatus;
 import com.go_air.enums.SeatType;
+import com.go_air.enums.SpecialFareType;
 import com.go_air.enums.TravelClass;
+import com.go_air.enums.TripType;
 import com.go_air.repo.FlightRepository;
 import com.go_air.repo.SeatRepository;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
 @Service
@@ -31,6 +40,9 @@ public class AdminService {
     private FlightRepository flightRepo;
     @Autowired
     private  SeatRepository seatRepository;
+    
+    private static final Logger log = LoggerFactory.getLogger(AdminService.class);
+
 
     // Create flight
     public Flights createFlight(Flights flight) {
@@ -80,7 +92,86 @@ public class AdminService {
         return "Flight with number " + flightNumber + " not found.";
     }
     
-    
+    public Map<String, Object> searchFlightsWithPagination(
+            List<String> airlines,
+            String sourceAirport,
+            String destinationAirport,
+            LocalDate departureDate,
+            LocalDate retDate,
+            Integer stop,
+            BookingType bookingType,
+            DepartureType departureType,
+            Integer minPrice,
+            Integer maxPrice,
+            AircraftSize aircraftSize,
+            SpecialFareType specialFareType,
+            int page,
+            int limit
+    ) {
+        if (page < 0) page = 0;
+        if (limit <= 0) limit = 5;
+
+        List<String> validAirlines = (airlines != null && !airlines.isEmpty())
+                ? airlines.stream().map(String::trim).filter(s -> !s.isEmpty()).toList()
+                : null;
+
+        List<Flights> flights = flightRepo.findFlightsByOptionalFilters(
+                validAirlines,
+                sourceAirport != null && !sourceAirport.isBlank() ? sourceAirport.trim() : null,
+                destinationAirport != null && !destinationAirport.isBlank() ? destinationAirport.trim() : null,
+                departureDate,
+                stop,
+                bookingType,       // pass enum directly
+                departureType,     // pass enum directly
+                minPrice,
+                maxPrice,
+                aircraftSize       // pass enum directly
+        );
+
+        // Apply special fare discount if provided
+        if (specialFareType != null) {
+            flights.forEach(f -> f.setPrice(specialFareType.applyDiscount(f.getPrice())));
+        }
+
+        // Remove duplicates
+        flights = new ArrayList<>(new LinkedHashSet<>(flights));
+
+        // Pagination
+        int total = flights.size();
+        int fromIndex = Math.min(page * limit, total);
+        int toIndex = Math.min(fromIndex + limit, total);
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("totalElements", total);
+        response.put("page", page);
+        response.put("limit", limit);
+        response.put("flights", flights.subList(fromIndex, toIndex));
+
+        return response;
+    }
+
+
+    // Extra Method For Experimantation
+    public Map<String, Object> getAllFlightsPaginated(int page, int limit) {
+        List<Flights> allFlights = flightRepo.findAll(); // assuming flightsRepository exists
+        int total = allFlights.size();
+
+        int fromIndex = page * limit;
+        int toIndex = Math.min(fromIndex + limit, total);
+
+        List<Flights> pagedFlights = allFlights.subList(
+                Math.min(fromIndex, total),
+                Math.min(toIndex, total)
+        );
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("totalElements", total);
+        response.put("page", page);
+        response.put("limit", limit);
+        response.put("flights", pagedFlights);
+
+        return response;
+    }
 
     @Transactional
     public SeatOperationStatus generateSeatsForFlight(String flightNo) {

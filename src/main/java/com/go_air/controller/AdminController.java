@@ -8,15 +8,29 @@ import org.springframework.web.bind.annotation.*;
 import com.go_air.service.AdminService;
 import com.go_air.entity.Flights;
 import com.go_air.entity.Seat;
+import com.go_air.enums.AircraftSize;
+import com.go_air.enums.BookingType;
+import com.go_air.enums.DepartureType;
 import com.go_air.enums.SeatOperationStatus;
+import com.go_air.enums.SpecialFareType;
+import com.go_air.enums.TripType;
 import com.go_air.aop.ValidateFlightData;
 
+import java.time.LocalDate;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
 @RestController
+
 @CrossOrigin("*")
 @RequestMapping("/admin")
 public class AdminController {
+
+	private static final Logger log = LoggerFactory.getLogger(AdminService.class);
 
     @Autowired
     private AdminService adminService;
@@ -25,7 +39,75 @@ public class AdminController {
 //    public void updateFlightStatuses() {
 //    	adminService.updateJourneyStatuses();
 //    }
-//    
+    
+    
+    
+    @GetMapping("/searchByPaginationAndFilters")
+    public Map<String, Object> searchFlightsByPaginationAndFilters(
+            @RequestParam(required = false) List<String> airlines,
+            @RequestParam(required = false) String sourceAirport,
+            @RequestParam(required = false) String destinationAirport,
+            @RequestParam(required = false) String departureDate,
+            @RequestParam(required = false) String retDate,
+            @RequestParam(required = false) Integer stop,
+            @RequestParam(required = false) BookingType bookingType,
+            @RequestParam(required = false) DepartureType departureType,
+            @RequestParam(required = false) Integer minPrice,
+            @RequestParam(required = false) Integer maxPrice,
+            @RequestParam(required = false) AircraftSize aircraftSize,
+            @RequestParam(required = false) SpecialFareType specialFareType,
+            @RequestParam(defaultValue = "0") Integer page,
+            @RequestParam(defaultValue = "5") Integer limit
+    ) {
+
+        if (stop != null && stop == 0) stop = null;
+
+        // Clean airlines list
+        airlines = cleanList(airlines);
+
+        // Parse dates
+        LocalDate parsedDepartureDate = (departureDate != null && !departureDate.isEmpty())
+                ? LocalDate.parse(departureDate)
+                : null;
+        LocalDate parsedRetDate = (retDate != null && !retDate.isEmpty())
+                ? LocalDate.parse(retDate)
+                : null;
+
+        // Call service (pass enums directly)
+        return adminService.searchFlightsWithPagination(
+                airlines,
+                sourceAirport,
+                destinationAirport,
+                parsedDepartureDate,
+                parsedRetDate,
+                stop,
+                bookingType,
+                departureType,
+                minPrice,
+                maxPrice,
+                aircraftSize,
+                specialFareType,
+                page,
+                limit
+        );
+    }
+
+
+
+
+    // ---------- Helper methods ----------
+  
+    // 🔹 Helper to remove empty strings or "Select" options
+    private List<String> cleanList(List<String> list) {
+        if (list == null) return null;
+        List<String> cleaned = list.stream()
+                .filter(s -> s != null && !s.trim().isEmpty() && !s.startsWith("Select"))
+                .toList();
+        return cleaned.isEmpty() ? null : cleaned;
+    }
+
+
+  
 //    @PreAuthorize("hasAuthority('ADMIN')")
     @PostMapping("/generate-seats/{flightNo}")
     public ResponseEntity<String> generateSeats(@PathVariable String flightNo) {

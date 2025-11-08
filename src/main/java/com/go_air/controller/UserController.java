@@ -17,6 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
@@ -137,22 +138,27 @@ public class UserController {
     // For Booking
     @PostMapping("/book/{userId}")
     @ValidateFlightData
-    public ResponseEntity<Map<String, Object>> bookFlight(
+    public ResponseEntity<Map<String, Object>> bookFlights(
             @PathVariable String userId,
-            @RequestBody Booking bookingRequest) {
+            @RequestBody List<Booking> bookingRequests) {
+
         Map<String, Object> response = new HashMap<>();
-        
+        List<Long> bookingIds = new ArrayList<>();
+
+        for (Booking bookingRequest : bookingRequests) {
             Booking booking = userService.bookFlight(userId, bookingRequest);
+            bookingIds.add(booking.getId());
+        }
 
-            response.put("message", "Flight booked successfully!");
-            response.put("userId", booking.getUser().getUserID());
-            response.put("bookingId", booking.getId());
-            response.put("status", booking.getStatus());
-            response.put("bookingTime", booking.getBookingTime());
+        response.put("message", "Flights booked successfully!");
+        response.put("userId", userId);
+        response.put("bookingIds", bookingIds);
+        response.put("status", "CONFIRMED");
+        response.put("bookingTime", LocalDateTime.now());
 
-            return ResponseEntity.status(201).body(response); // 201 Created
-       
+        return ResponseEntity.status(201).body(response);
     }
+
 
     // Get Tickets
     @GetMapping("/tickets/{userId}")
