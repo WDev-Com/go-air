@@ -48,7 +48,6 @@ public class AdminController {
             @RequestParam(required = false) String sourceAirport,
             @RequestParam(required = false) String destinationAirport,
             @RequestParam(required = false) String departureDate,
-            @RequestParam(required = false) String retDate,
             @RequestParam(required = false) Integer stop,
             @RequestParam(required = false) BookingType bookingType,
             @RequestParam(required = false) DepartureType departureType,
@@ -59,27 +58,18 @@ public class AdminController {
             @RequestParam(defaultValue = "0") Integer page,
             @RequestParam(defaultValue = "5") Integer limit
     ) {
-
         if (stop != null && stop == 0) stop = null;
-
-        // Clean airlines list
         airlines = cleanList(airlines);
 
-        // Parse dates
-        LocalDate parsedDepartureDate = (departureDate != null && !departureDate.isEmpty())
-                ? LocalDate.parse(departureDate)
-                : null;
-        LocalDate parsedRetDate = (retDate != null && !retDate.isEmpty())
-                ? LocalDate.parse(retDate)
-                : null;
+//        LocalDate parsedDepartureDate = (departureDate != null && !departureDate.isEmpty())
+//                ? LocalDate.parse(departureDate)
+//                : null;
 
-        // Call service (pass enums directly)
         return adminService.searchFlightsWithPagination(
                 airlines,
                 sourceAirport,
                 destinationAirport,
-                parsedDepartureDate,
-                parsedRetDate,
+                departureDate,
                 stop,
                 bookingType,
                 departureType,
@@ -91,6 +81,7 @@ public class AdminController {
                 limit
         );
     }
+
 
 
 

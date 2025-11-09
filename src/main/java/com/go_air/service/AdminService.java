@@ -59,17 +59,22 @@ public class AdminService {
         return flightRepo.findByFlightNumber(flightNumber).orElse(null);
     }
 
-    // Update flight by flight number
+ // Update flight by flight number
     public Flights updateFlightByFlightNumber(String flightNumber, Flights updatedFlight) {
         Flights flight = flightRepo.findByFlightNumber(flightNumber).orElse(null);
+       
         if (flight != null) {
+            // Update all fields except id and seats
             flight.setAirline(updatedFlight.getAirline());
+            flight.setFlightNumber(updatedFlight.getFlightNumber());
             flight.setSourceAirport(updatedFlight.getSourceAirport());
             flight.setDestinationAirport(updatedFlight.getDestinationAirport());
             flight.setStop(updatedFlight.getStop());
             flight.setDestinationStop(updatedFlight.getDestinationStop());
             flight.setBookingType(updatedFlight.getBookingType());
             flight.setDepartureType(updatedFlight.getDepartureType());
+            flight.setAircraftSize(updatedFlight.getAircraftSize());
+            flight.setBoardingTime(updatedFlight.getBoardingTime());
             flight.setDepartureDate(updatedFlight.getDepartureDate());
             flight.setDepartureTime(updatedFlight.getDepartureTime());
             flight.setArrivalDate(updatedFlight.getArrivalDate());
@@ -77,10 +82,14 @@ public class AdminService {
             flight.setDurationMinutes(updatedFlight.getDurationMinutes());
             flight.setPrice(updatedFlight.getPrice());
             flight.setAvailableSeats(updatedFlight.getAvailableSeats());
+            flight.setJourneyStatus(updatedFlight.getJourneyStatus());
+            
             return flightRepo.save(flight);
         }
+
         return null;
     }
+
 
     // Delete flight by flight number
     public String deleteFlightByFlightNumber(String flightNumber) {
@@ -96,8 +105,7 @@ public class AdminService {
             List<String> airlines,
             String sourceAirport,
             String destinationAirport,
-            LocalDate departureDate,
-            LocalDate retDate,
+            String departureDate,
             Integer stop,
             BookingType bookingType,
             DepartureType departureType,
@@ -111,24 +119,29 @@ public class AdminService {
         if (page < 0) page = 0;
         if (limit <= 0) limit = 5;
 
-        List<String> validAirlines = (airlines != null && !airlines.isEmpty())
-                ? airlines.stream().map(String::trim).filter(s -> !s.isEmpty()).toList()
+        // Convert airlines list → comma-separated string
+        String airlinesText = (airlines != null && !airlines.isEmpty())
+                ? String.join(",", airlines)
                 : null;
 
-        List<Flights> flights = flightRepo.findFlightsByOptionalFilters(
-                validAirlines,
-                sourceAirport != null && !sourceAirport.isBlank() ? sourceAirport.trim() : null,
-                destinationAirport != null && !destinationAirport.isBlank() ? destinationAirport.trim() : null,
+        String bookingTypeStr = (bookingType != null) ? bookingType.name() : null;
+        String departureTypeStr = (departureType != null) ? departureType.name() : null;
+        String aircraftSizeStr = (aircraftSize != null) ? aircraftSize.name() : null;
+
+        List<Flights> flights = flightRepo.searchFlightsByPaginationAndFilters(
+                airlinesText,
+                (sourceAirport != null && !sourceAirport.isBlank()) ? sourceAirport.trim() : null,
+                (destinationAirport != null && !destinationAirport.isBlank()) ? destinationAirport.trim() : null,
                 departureDate,
                 stop,
-                bookingType,       // pass enum directly
-                departureType,     // pass enum directly
+                bookingTypeStr,
+                departureTypeStr,
                 minPrice,
                 maxPrice,
-                aircraftSize       // pass enum directly
+                aircraftSizeStr
         );
 
-        // Apply special fare discount if provided
+        // Apply discount if special fare provided
         if (specialFareType != null) {
             flights.forEach(f -> f.setPrice(specialFareType.applyDiscount(f.getPrice())));
         }
@@ -136,7 +149,7 @@ public class AdminService {
         // Remove duplicates
         flights = new ArrayList<>(new LinkedHashSet<>(flights));
 
-        // Pagination
+        // Pagination logic unchanged
         int total = flights.size();
         int fromIndex = Math.min(page * limit, total);
         int toIndex = Math.min(fromIndex + limit, total);
@@ -149,6 +162,7 @@ public class AdminService {
 
         return response;
     }
+
 
 
     // Extra Method For Experimantation
