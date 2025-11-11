@@ -6,14 +6,18 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import com.go_air.service.AdminService;
+import com.go_air.entity.Booking;
 import com.go_air.entity.Flights;
 import com.go_air.entity.Seat;
 import com.go_air.enums.AircraftSize;
+import com.go_air.enums.BookingStatus;
 import com.go_air.enums.BookingType;
 import com.go_air.enums.DepartureType;
+import com.go_air.enums.JourneyStatus;
 import com.go_air.enums.SeatOperationStatus;
 import com.go_air.enums.SpecialFareType;
 import com.go_air.enums.TripType;
+import com.go_air.model.dtos.BookingResponseDTO;
 import com.go_air.aop.ValidateFlightData;
 
 import java.time.LocalDate;
@@ -82,6 +86,32 @@ public class AdminController {
         );
     }
 
+    
+    // Get Booking by filters
+    @GetMapping("/bookings/search")
+    public ResponseEntity<List<BookingResponseDTO>> getAllBookingsByFilters(
+            @RequestParam(required = false) String bookingNo,
+            @RequestParam(required = false) String flightNumber,
+            @RequestParam(required = false) TripType tripType,
+            @RequestParam(required = false) String userName,
+            @RequestParam(required = false) String userId,
+            @RequestParam(required = false) BookingStatus status,
+            @RequestParam(required = false) SpecialFareType specialFareType,
+            @RequestParam(required = false) JourneyStatus journeyStatus
+    ) {
+        List<BookingResponseDTO> bookings = adminService.getBookingsByFilters(
+                bookingNo,
+                flightNumber,
+                tripType,
+                userName,
+                userId,
+                status,
+                specialFareType,
+                journeyStatus
+        );
+
+        return ResponseEntity.ok(bookings);
+    }
 
 
 
@@ -117,7 +147,7 @@ public class AdminController {
     }
 
 
-//    @PreAuthorize("hasAuthority('ADMIN')")
+
     @GetMapping("/flight/seats/{flightNumber}")
     public ResponseEntity<List<Seat>> getSeatsByFlightNo(@PathVariable String flightNumber) {
         List<Seat> seats = adminService.getSeatsByFlightNumber(flightNumber);

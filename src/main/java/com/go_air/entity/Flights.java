@@ -45,6 +45,11 @@ public class Flights {
 
     @Enumerated(EnumType.STRING)
     private BookingType bookingType;
+    
+    // This is in percentage
+    @Column(name = "cancellation_charges", nullable = false, columnDefinition = "integer default 0")
+    private int cancellationCharges;
+
 
     @Enumerated(EnumType.STRING)
     private DepartureType departureType;

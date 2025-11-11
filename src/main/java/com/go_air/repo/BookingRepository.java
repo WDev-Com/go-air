@@ -1,6 +1,11 @@
 package com.go_air.repo;
 
 import com.go_air.entity.Booking;
+import com.go_air.entity.User;
+import com.go_air.enums.BookingStatus;
+import com.go_air.enums.JourneyStatus;
+import com.go_air.enums.SpecialFareType;
+import com.go_air.enums.TripType;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -43,7 +48,8 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             @Param("arrDate") LocalDate arrDate,
             @Param("arrTime") LocalTime arrTime
     );
-	
+    
+
     // Find all bookings by user ID
     List<Booking> findByUser_UserID(String userId);
 
@@ -52,4 +58,28 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
 
     // Find all bookings containing a specific passenger
     List<Booking> findByPassengers_Id(Long passengerId);
+    
+    //fing booking by bookingNo
+    List<Booking> findByBookingNo(String bookingNo);
+    
+    @Query("""
+            SELECT b FROM Booking b
+            WHERE 
+                (:bookingNo IS NULL OR b.bookingNo = :bookingNo) AND
+                (:flightNumber IS NULL OR b.flightNumber = :flightNumber) AND
+                (:tripType IS NULL OR b.tripType = :tripType) AND
+                (:user IS NULL OR b.user = :user) AND
+                (:status IS NULL OR b.status = :status) AND
+                (:specialFareType IS NULL OR b.specialFareType = :specialFareType) AND
+                (:journeyStatus IS NULL OR b.journeyStatus = :journeyStatus)
+        """)
+        List<Booking> findBookingsByFilters(
+            @Param("bookingNo") String bookingNo,
+            @Param("flightNumber") String flightNumber,
+            @Param("tripType") TripType tripType,
+            @Param("user") User user,
+            @Param("status") BookingStatus status,
+            @Param("specialFareType") SpecialFareType specialFareType,
+            @Param("journeyStatus") JourneyStatus journeyStatus
+        );
 }

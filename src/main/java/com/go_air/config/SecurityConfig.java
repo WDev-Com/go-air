@@ -48,13 +48,10 @@ class SecurityConfig {
                         "/auth/checkusername",
                         "/auth/signup",                         
                         "/auth/adduser",
-                        "/auth/refreshToken",
-                        "/user/**",
-                        "/admin/**"
-                       
+                        "/auth/refreshToken"
                 ).permitAll()
-//                .requestMatchers("/admin/**").hasAuthority("ADMIN")
-//                .anyRequest().authenticated()
+                .requestMatchers("/admin/**").hasAuthority("ADMIN")
+                .anyRequest().authenticated()
             )
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .exceptionHandling(ex -> ex.authenticationEntryPoint(jwtEntryPoint))

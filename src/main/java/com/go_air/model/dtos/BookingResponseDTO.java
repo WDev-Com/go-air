@@ -22,13 +22,15 @@ import java.util.List;
 public class BookingResponseDTO {
 
     private Long id;
+    private String bookingNo;
+
     private String flightNumber;
     private TripType tripType;
     private AircraftSize aircraftSize;
     private SpecialFareType specialFareType;
     private JourneyStatus journeyStatus;
     private BookingStatus status;
-    
+    private String contactPhone;
     private LocalDate departureDate;
     private LocalTime departureTime;
     private LocalDate arrivalDate;
@@ -50,4 +52,7 @@ public class BookingResponseDTO {
     private double totalAmount;
     
     private List<PassengerResponseDTO> passengers;
+    
+    private String username;
+    private String userID;
 }

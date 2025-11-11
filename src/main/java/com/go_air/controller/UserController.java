@@ -186,17 +186,13 @@ public class UserController {
     }
 
     // Cancel a booking
-    @PutMapping("/cancel/{bookingId}")
-    public ResponseEntity<Map<String, String>> cancelBooking(@PathVariable Long bookingId) {
-        Booking cancelledBooking = userService.cancelBooking(bookingId);
-
-        Map<String, String> response = new HashMap<>();
-        response.put("message", "Booking cancelled successfully");
-        response.put("bookingId", String.valueOf(cancelledBooking.getId()));
-        response.put("status", cancelledBooking.getStatus().toString());
-
+    @PutMapping("/cancel/{bookingNo}")
+    public ResponseEntity<Map<String, Object>> cancelBooking(@PathVariable String bookingNo) {
+        Map<String, Object> response = userService.cancelBooking(bookingNo);
         return ResponseEntity.ok(response); // 200 OK
     }
+
+
 
     // Get all users
     @GetMapping("/get-all")

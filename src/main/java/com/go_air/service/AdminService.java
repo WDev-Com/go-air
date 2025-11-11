@@ -1,8 +1,11 @@
 package com.go_air.service;
 
+import com.go_air.entity.Booking;
 import com.go_air.entity.Flights;
 import com.go_air.entity.Seat;
+import com.go_air.entity.User;
 import com.go_air.enums.AircraftSize;
+import com.go_air.enums.BookingStatus;
 import com.go_air.enums.BookingType;
 import com.go_air.enums.DepartureType;
 import com.go_air.enums.JourneyStatus;
@@ -13,8 +16,11 @@ import com.go_air.enums.SeatType;
 import com.go_air.enums.SpecialFareType;
 import com.go_air.enums.TravelClass;
 import com.go_air.enums.TripType;
+import com.go_air.model.dtos.BookingResponseDTO;
+import com.go_air.repo.BookingRepository;
 import com.go_air.repo.FlightRepository;
 import com.go_air.repo.SeatRepository;
+import com.go_air.repo.UserRepository;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -40,6 +46,10 @@ public class AdminService {
     private FlightRepository flightRepo;
     @Autowired
     private  SeatRepository seatRepository;
+    @Autowired
+    private  BookingRepository bookingRepository;
+    @Autowired
+    private  UserRepository userRepository;
     
     private static final Logger log = LoggerFactory.getLogger(AdminService.class);
 
@@ -101,6 +111,76 @@ public class AdminService {
         return "Flight with number " + flightNumber + " not found.";
     }
     
+    // Bookings by filters
+    public List<BookingResponseDTO> getBookingsByFilters(
+            String bookingNo,
+            String flightNumber,
+            TripType tripType,
+            String userName,
+            String userId,
+            BookingStatus status,
+            SpecialFareType specialFareType,
+            JourneyStatus journeyStatus) {
+
+        User user = null;
+        if (userId != null) {
+            user = userRepository.findByUserID(userId).orElse(null);
+        } else if (userName != null) {
+            user = userRepository.findByUsername(userName);
+        }
+
+        List<Booking> bookings = bookingRepository.findBookingsByFilters(
+                bookingNo,
+                flightNumber,
+                tripType,
+                user,
+                status,
+                specialFareType,
+                journeyStatus
+        );
+
+        return bookings.stream()
+                .map(this::convertToBookingResponseDTO)
+                .toList();
+    }
+
+    
+    private BookingResponseDTO convertToBookingResponseDTO(Booking booking) {
+        User user = booking.getUser();
+
+        return BookingResponseDTO.builder()
+                .id(booking.getId())
+                .bookingNo(booking.getBookingNo())
+                .flightNumber(booking.getFlightNumber())
+                .tripType(booking.getTripType())
+                .aircraftSize(booking.getAircraftSize())
+
+                .departureDate(booking.getDepartureDate())
+                .departureTime(booking.getDepartureTime())
+                .arrivalDate(booking.getArrivalDate())
+                .arrivalTime(booking.getArrivalTime())
+                .bookingTime(booking.getBookingTime())
+
+                // ✅ Contact details directly from Booking
+                .contactPhone(booking.getContactPhone())       
+
+                .totalAmount(booking.getTotalAmount())
+                .status(booking.getStatus())
+                .specialFareType(booking.getSpecialFareType())
+                .journeyStatus(booking.getJourneyStatus())
+
+                .passengerCount(booking.getPassengerCount())
+
+                // ✅ User details for reference
+                .userID(user != null ? user.getUserID() : null)
+                .username(user != null ? user.getUsername() : null)
+
+                .build();
+    }
+
+
+    
+    // Search flights by pagination and filters
     public Map<String, Object> searchFlightsWithPagination(
             List<String> airlines,
             String sourceAirport,

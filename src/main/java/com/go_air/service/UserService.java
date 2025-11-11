@@ -29,11 +29,13 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -363,13 +365,100 @@ public class UserService {
 
 
     // Cancel booking
-    public Booking cancelBooking(Long bookingId) {
-        Booking booking = bookingRepo.findById(bookingId)
-                .orElseThrow(() -> new RuntimeException("Booking not found"));
+ // Cancel booking
+    public Map<String, Object> cancelBooking(String bookingNo) {
 
-        booking.setStatus(BookingStatus.CANCELLED);
-        return bookingRepo.save(booking);
+        // ✅ Fetch all bookings for the booking number (ONE_WAY, ROUND_TRIP, MULTI_CITY)
+        List<Booking> bookings = bookingRepo.findByBookingNo(bookingNo);
+
+        if (bookings == null || bookings.isEmpty()) {
+            throw new RuntimeException("Booking not found");
+        }
+
+        // ✅ Prepare response map
+        Map<String, Object> response = new HashMap<>();
+        List<Map<String, String>> flightResponses = new ArrayList<>();
+
+        // ✅ Loop through each flight under the same booking number
+        for (Booking booking : bookings) {
+            String flightNumber = booking.getFlightNumber();
+
+            Flights flight = flightRepository.findByFlightNumber(flightNumber)
+                    .orElseThrow(() -> new RuntimeException("Flight not found for flight number: " + flightNumber));
+
+            Map<String, String> flightResponse = new HashMap<>();
+            flightResponse.put("bookingId", String.valueOf(booking.getId()));
+            flightResponse.put("flightNumber", flight.getFlightNumber());
+
+            // ✅ Check if flight is already cancelled
+            if (booking.getStatus() == BookingStatus.CANCELLED) {
+                flightResponse.put("status", BookingStatus.CANCELLED.toString());
+                flightResponse.put("message", String.format(
+                        "This flight (%s) has already been cancelled earlier.",
+                        flightNumber));
+                flightResponses.add(flightResponse);
+                continue; // move to next flight
+            }
+
+            // ✅ Proceed to cancel
+            booking.setStatus(BookingStatus.CANCELLED);
+            bookingRepo.save(booking);
+            flightResponse.put("status", booking.getStatus().toString());
+
+            // ✅ Case 1: NON-REFUNDABLE
+            if (flight.getBookingType() == BookingType.NON_REFUNDABLE) {
+                flightResponse.put("message",
+                        "Your booking for this flight has been cancelled successfully. This ticket was NON-REFUNDABLE, so no refund will be issued.");
+                flightResponses.add(flightResponse);
+                continue;
+            }
+
+            // ✅ Case 2: REFUNDABLE
+            Double totalAmount = booking.getTotalAmount();
+            int baseCancellationCharge = flight.getCancellationCharges(); // %
+
+            LocalDate departureDate = flight.getDepartureDate();
+            LocalTime departureTime = flight.getDepartureTime();
+            LocalDateTime departureDateTime = LocalDateTime.of(departureDate, departureTime);
+            LocalDateTime now = LocalDateTime.now();
+
+            long hoursBeforeDeparture = Duration.between(now, departureDateTime).toHours();
+            int finalCancellationPercent;
+
+            if (hoursBeforeDeparture > 48) {
+                finalCancellationPercent = baseCancellationCharge / 2; // before 2 days
+            } else if (hoursBeforeDeparture >= 24) {
+                finalCancellationPercent = baseCancellationCharge; // 24–48 hours
+            } else if (hoursBeforeDeparture < 4) {
+                finalCancellationPercent = (int) Math.round(baseCancellationCharge * 1.2); // +20%
+            } else {
+                finalCancellationPercent = baseCancellationCharge; // default case
+            }
+
+            if (finalCancellationPercent > 100) finalCancellationPercent = 100;
+
+            double refundAmount = totalAmount - ((finalCancellationPercent / 100.0) * totalAmount);
+
+            flightResponse.put("refundAmount", String.format("%.2f", refundAmount));
+            flightResponse.put("cancellationCharges", finalCancellationPercent + "%");
+            flightResponse.put("message", String.format(
+                    "Your booking for flight %s has been cancelled successfully. %.2f will be credited to your account within 2-3 business days (after deducting %d%% cancellation charges).",
+                    flightNumber, refundAmount, finalCancellationPercent));
+
+            flightResponses.add(flightResponse);
+        }
+
+        // ✅ Return combined response
+        response.put("bookingNo", bookingNo);
+        response.put("status", "CANCELLED");
+        response.put("flights", flightResponses);
+        response.put("message", "Cancellation request processed successfully.");
+
+        return response;
     }
+
+
+
     
     
     // Get all bookings for a user
@@ -544,7 +633,7 @@ public class UserService {
                             .bookingTime(booking.getBookingTime())
                             .passengerCount(booking.getPassengerCount())
                             .totalAmount(booking.getTotalAmount())
-
+                            .bookingNo(booking.getBookingNo())
                             // Flight info
                             .airline(flight != null ? flight.getAirline() : null)
                             .sourceAirport(flight != null ? flight.getSourceAirport() : null)
@@ -559,7 +648,7 @@ public class UserService {
                             .departureType(flight != null ? flight.getDepartureType() : null)
                             .durationMinutes(flight != null ? flight.getDurationMinutes() : null)
                             .price(flight != null ? flight.getPrice() : null)
-
+                              
                             // Passengers
                             .passengers(passengerDTOs)
                             .build();
