@@ -10,8 +10,8 @@ import org.springframework.data.repository.query.Param;
 
 public interface SeatRepository extends JpaRepository<Seat, Long> {
 	
-	 @Query("SELECT s FROM Seat s WHERE s.flight.flightNumber = :flightNumber ORDER BY s.rowNumber, s.columnLabel")
-	    List<Seat> findSeatsByFlightNumber(@Param("flightNumber") String flightNumber);
+	@Query("SELECT s FROM Seat s WHERE s.flight.flightNumber = :flightNumber ORDER BY s.rowNumber, s.columnLabel")
+	List<Seat> findSeatsByFlightNumber(@Param("flightNumber") String flightNumber);
 
-	 
+
 }

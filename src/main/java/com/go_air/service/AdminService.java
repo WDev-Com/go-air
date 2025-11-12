@@ -380,9 +380,9 @@ public class AdminService {
      * @param flightNumber The flight number (e.g., "GA102")
      * @return List of Seat entities
      */
-    public List<Seat> getSeatsByFlightNumber(String flightNumber) {
-        return seatRepository.findSeatsByFlightNumber(flightNumber);
-    }
+//    public List<Seat> getSeatsByFlightNumber(String flightNumber) {
+//        return seatRepository.findSeatsByFlightNumber(flightNumber);
+//    }
     
     @Transactional
     public void updateJourneyStatuses() {

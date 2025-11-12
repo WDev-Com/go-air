@@ -3,6 +3,7 @@ package com.go_air.controller;
 import com.go_air.aop.ValidateFlightData;
 import com.go_air.entity.Booking;
 import com.go_air.entity.Flights;
+import com.go_air.entity.Seat;
 import com.go_air.entity.User;
 import com.go_air.enums.AircraftSize;
 import com.go_air.enums.BookingType;
@@ -11,7 +12,11 @@ import com.go_air.enums.SpecialFareType;
 import com.go_air.enums.TripType;
 import com.go_air.model.dtos.BookingResponseDTO;
 import com.go_air.model.dtos.PassengerTicketDTO;
+import com.go_air.service.AdminService;
 import com.go_air.service.UserService;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -30,6 +35,8 @@ public class UserController {
     @Autowired
     private UserService userService;
     
+    private static final Logger log = LoggerFactory.getLogger(AdminService.class);
+   
     @GetMapping("/flights/search")
     @ValidateFlightData
     public ResponseEntity<?> searchFlights(
@@ -97,6 +104,14 @@ public class UserController {
         );
 
         return ResponseEntity.ok(flights);
+    }
+
+    /// Get Seats by flight No
+    @GetMapping("/flight/seats/{flightNumber}")
+    public ResponseEntity<List<Seat>> getSeatsByFlightNo(@PathVariable String flightNumber) {
+        log.info("Flightno =======================>>>> {}", flightNumber);
+        List<Seat> seats = userService.getSeatsByFlightNumber(flightNumber);
+        return ResponseEntity.ok(seats);
     }
 
     

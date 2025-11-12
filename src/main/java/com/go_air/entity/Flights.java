@@ -4,7 +4,6 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.List;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.go_air.enums.AircraftSize;
 import com.go_air.enums.BookingType;
@@ -32,10 +31,13 @@ public class Flights {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "flight_number", nullable = false, unique = true)
+    private String flightNumber;
+	
     @Column(name = "airline")
     private String airline;
-    @Column(nullable = false, unique = true) 
-    private String flightNumber;
+    
     @Column(name = "source_airport")
     private String sourceAirport;
     @Column(name = "destination_airport")
@@ -83,7 +85,7 @@ public class Flights {
 
  
     @OneToMany(mappedBy = "flight", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    @JsonIgnore
+    @JsonManagedReference  // //for parent-child relationships and prevent infinite recursion during JSON serialization
     private List<Seat> seats;
 }
 

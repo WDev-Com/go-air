@@ -1,7 +1,7 @@
 package com.go_air.entity;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonManagedReference;
+
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.go_air.enums.SeatPosition;
 import com.go_air.enums.SeatStatus;
 import com.go_air.enums.SeatType;
@@ -43,7 +43,8 @@ public class Seat {
     private TravelClass travelClass; 
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "flight_number",referencedColumnName = "flightNumber", nullable = false)
-    @JsonIgnore
+    @JoinColumn(name = "flight_number", referencedColumnName = "flight_number" ,nullable = false)
+    @JsonBackReference //for parent-child relationships and prevent infinite recursion during JSON serialization
     private Flights flight;
+    
 }
