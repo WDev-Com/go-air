@@ -82,4 +82,11 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
             @Param("specialFareType") SpecialFareType specialFareType,
             @Param("journeyStatus") JourneyStatus journeyStatus
         );
+    
+    
+
+    // ✅ Find bookings by userId (String) and status
+    @Query("SELECT b FROM Booking b LEFT JOIN FETCH b.passengers WHERE b.user.userID = :userId AND b.status = :status")
+    List<Booking> findByUser_UserIDAndStatusWithPassengers(@Param("userId") String userId, @Param("status") BookingStatus status);
+
 }

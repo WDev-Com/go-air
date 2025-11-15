@@ -6,9 +6,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import com.go_air.service.AdminService;
-import com.go_air.entity.Booking;
 import com.go_air.entity.Flights;
-import com.go_air.entity.Seat;
 import com.go_air.enums.AircraftSize;
 import com.go_air.enums.BookingStatus;
 import com.go_air.enums.BookingType;
@@ -19,30 +17,26 @@ import com.go_air.enums.SpecialFareType;
 import com.go_air.enums.TripType;
 import com.go_air.model.dtos.BookingResponseDTO;
 import com.go_air.aop.ValidateFlightData;
-
-import java.time.LocalDate;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
-@RestController
+//import org.slf4j.Logger;
+//import org.slf4j.LoggerFactory;
 
+@RestController
 @CrossOrigin("*")
 @RequestMapping("/admin")
 public class AdminController {
 
-	private static final Logger log = LoggerFactory.getLogger(AdminService.class);
+	//private static final Logger log = LoggerFactory.getLogger(AdminService.class);
 
     @Autowired
     private AdminService adminService;
     
-//    @Scheduled(fixedRate = 60000) // every 1 minute
-//    public void updateFlightStatuses() {
-//    	adminService.updateJourneyStatuses();
-//    }
+    @Scheduled(fixedRate = 60000) // every 1 minute
+    public void updateFlightStatuses() {
+    	adminService.updateJourneyStatuses();
+    }
     
     
     @PreAuthorize("hasAuthority('ADMIN')")
@@ -65,9 +59,6 @@ public class AdminController {
         if (stop != null && stop == 0) stop = null;
         airlines = cleanList(airlines);
 
-//        LocalDate parsedDepartureDate = (departureDate != null && !departureDate.isEmpty())
-//                ? LocalDate.parse(departureDate)
-//                : null;
 
         return adminService.searchFlightsWithPagination(
                 airlines,
@@ -147,12 +138,6 @@ public class AdminController {
     }
 
 
-
-//    @GetMapping("/flight/seats/{flightNumber}")
-//    public ResponseEntity<List<Seat>> getSeatsByFlightNo(@PathVariable String flightNumber) {
-//        List<Seat> seats = adminService.getSeatsByFlightNumber(flightNumber);
-//        return ResponseEntity.ok(seats);
-//    }
     
    @PreAuthorize("hasAuthority('ADMIN')")
    // Get flight by flight number

@@ -38,6 +38,19 @@ class SecurityConfig {
     @Bean
     SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
+        .headers(headers -> headers
+                .contentSecurityPolicy(csp -> csp
+                    .policyDirectives(
+                        "default-src 'self'; " +
+                        "script-src 'self' https://js.stripe.com; " +
+                        "frame-src https://js.stripe.com https://hooks.stripe.com; " +
+                        "style-src 'self' 'unsafe-inline' https://js.stripe.com; " +
+                        "font-src 'self' data: https://js.stripe.com; " +
+                        "img-src 'self' data: https://*.stripe.com; " +
+                        "connect-src 'self' https://api.stripe.com https://js.stripe.com;"
+                    )
+                )
+            )
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .authorizeHttpRequests(auth -> auth

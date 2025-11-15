@@ -8,10 +8,10 @@ import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.go_air.enums.AircraftSize;
 import com.go_air.enums.BookingStatus;
 import com.go_air.enums.JourneyStatus;
+import com.go_air.enums.PaymentStatus;
 import com.go_air.enums.SpecialFareType;
 import com.go_air.enums.TripType;
 import jakarta.persistence.*;
@@ -69,6 +69,12 @@ public class Booking {
     
     @Enumerated(EnumType.STRING)
     private SpecialFareType specialFareType;
+    
+    @Enumerated(EnumType.STRING)
+    private PaymentStatus paymentStatus;
+    
+    private String paymentID;
+    
     
     @Enumerated(EnumType.STRING)
     private JourneyStatus journeyStatus;

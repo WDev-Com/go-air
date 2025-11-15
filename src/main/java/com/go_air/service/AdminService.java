@@ -22,10 +22,8 @@ import com.go_air.repo.FlightRepository;
 import com.go_air.repo.SeatRepository;
 import com.go_air.repo.UserRepository;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -35,8 +33,6 @@ import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 
 @Service
@@ -51,7 +47,7 @@ public class AdminService {
     @Autowired
     private  UserRepository userRepository;
     
-    private static final Logger log = LoggerFactory.getLogger(AdminService.class);
+//    private static final Logger log = LoggerFactory.getLogger(AdminService.class);
 
 
     // Create flight

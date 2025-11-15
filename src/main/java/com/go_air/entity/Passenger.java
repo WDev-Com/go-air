@@ -2,7 +2,6 @@ package com.go_air.entity;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonManagedReference;
 import com.go_air.enums.DepartureType;
 import com.go_air.enums.Gender;
 import com.go_air.enums.SeatType;

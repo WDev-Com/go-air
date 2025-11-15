@@ -10,6 +10,7 @@ import com.go_air.enums.BookingStatus;
 import com.go_air.enums.BookingType;
 import com.go_air.enums.DepartureType;
 import com.go_air.enums.JourneyStatus;
+import com.go_air.enums.PaymentStatus;
 import com.go_air.enums.SeatStatus;
 import com.go_air.enums.SpecialFareType;
 import com.go_air.enums.TripType;
@@ -18,7 +19,6 @@ import com.go_air.model.dtos.PassengerResponseDTO;
 import com.go_air.model.dtos.PassengerTicketDTO;
 import com.go_air.repo.BookingRepository;
 import com.go_air.repo.FlightRepository;
-import com.go_air.repo.PassengerRepository;
 import com.go_air.repo.SeatRepository;
 import com.go_air.repo.UserRepository;
 
@@ -51,9 +51,6 @@ public class UserService {
     private BookingRepository bookingRepo;
     
     @Autowired
-    private PassengerRepository passengerRepo;
-    
-    @Autowired
     private UserRepository userRepository;
 
     @Autowired
@@ -68,7 +65,7 @@ public class UserService {
     @Autowired
     private SeatRepository seatRepository;
     
-    private static final Logger log = LoggerFactory.getLogger(AdminService.class);
+    private static final Logger log = LoggerFactory.getLogger(UserService.class);
     
     public Map<String, List<Flights>> searchFlightsByTripType(
             TripType tripType,
@@ -262,6 +259,21 @@ public class UserService {
     );
     }
 
+    public String generateUniqueBookingNumber() {
+
+        String timestamp = String.valueOf(System.currentTimeMillis()); // 13 digits
+        
+        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        StringBuilder randomPart = new StringBuilder();
+        java.util.Random random = new java.util.Random();
+
+        for (int i = 0; i < 6; i++) { // 6 random characters
+            randomPart.append(chars.charAt(random.nextInt(chars.length())));
+        }
+
+        return "BK" + timestamp + randomPart.toString();
+    }
+
 
     // Book a flight for a user with passengers
     @Transactional
@@ -326,7 +338,7 @@ public class UserService {
 
             totalAmount += baseFare;
 
-            seat.setSeatStatus(SeatStatus.OCCUPIED);
+            seat.setSeatStatus(SeatStatus.AVAILABLE);
             seatRepository.save(seat);
         }
 
@@ -342,7 +354,7 @@ public class UserService {
         bookingRequest.setPassengers(passengers);
         bookingRequest.setBookingTime(LocalDateTime.now());
         bookingRequest.setPassengerCount(passengers.size());
-        bookingRequest.setStatus(BookingStatus.CONFIRMED);
+        bookingRequest.setStatus(BookingStatus.PENDING);
         bookingRequest.setJourneyStatus(JourneyStatus.SCHEDULED);
         bookingRequest.setSpecialFareType(fareType);
         bookingRequest.setTotalAmount(finalAmount);
@@ -360,9 +372,64 @@ public class UserService {
 
         return savedBooking;
     }
+    
+    public List<Booking> getBookingsByBookingNo(String bookingNo) {
 
+        if (bookingNo == null || bookingNo.isEmpty()) {
+            throw new IllegalArgumentException("Booking number cannot be empty");
+        }
 
+        return bookingRepo.findByBookingNo(bookingNo);
+    }
 
+    
+    // ✅ Update all pending bookings of a user to a new status
+    @Transactional
+    public void updateBookingAfterPayment(String userId,
+                                          BookingStatus bookingStatus,
+                                          PaymentStatus paymentStatus,
+                                          String paymentId) {
+
+        List<Booking> pendingBookings =
+                bookingRepo.findByUser_UserIDAndStatusWithPassengers(userId, BookingStatus.PENDING);
+
+        if (pendingBookings.isEmpty()) return;
+
+        for (Booking booking : pendingBookings) {
+
+            booking.setStatus(bookingStatus);
+            booking.setPaymentStatus(paymentStatus);
+            booking.setPaymentID(paymentId);
+            bookingRepo.save(booking);
+
+            // only when confirmed
+            log.info("bookingStatus == BookingStatus.CONFIRMED : "+(bookingStatus == BookingStatus.CONFIRMED));
+            if (bookingStatus == BookingStatus.CONFIRMED) {
+
+                // UPDATE SEAT STATUS
+                for (Passenger passenger : booking.getPassengers()) {
+                    Seat seat = seatRepository
+                            .findByFlight_FlightNumberAndSeatNumber(
+                                    booking.getFlightNumber(),
+                                    passenger.getSeatNo()
+                            )
+                            .orElseThrow(() -> new RuntimeException(
+                                    "Seat " + passenger.getSeatNo() +
+                                            " not found on flight " + booking.getFlightNumber()));
+
+                    seat.setSeatStatus(SeatStatus.OCCUPIED);
+                    seatRepository.save(seat);
+                }
+
+                // UPDATE AVAILABLE SEATS
+                Flights flight = flightRepository.findByFlightNumber(booking.getFlightNumber())
+                        .orElseThrow(() -> new RuntimeException("Flight not found: " + booking.getFlightNumber()));
+
+                flight.setAvailableSeats(flight.getAvailableSeats() - booking.getPassengerCount());
+                flightRepository.save(flight);
+            }
+        }
+    }
 
 
 
@@ -459,26 +526,7 @@ public class UserService {
         return response;
     }
 
-
-
     
-    
-    // Get all bookings for a user
-    private List<PassengerResponseDTO> mapPassengers(List<Passenger> passengers) {
-        if (passengers == null) return List.of();
-
-        return passengers.stream()
-                .<PassengerResponseDTO>map(p -> PassengerResponseDTO.builder()
-                        .passengerId(p.getId())
-                        .name(p.getName())
-                        .gender(p.getGender())
-                        .age(p.getAge())
-                        .build())
-                .collect(Collectors.toList());
-        
-    // Generate Tickets By User
-    }
-
    // Get Tickets 
     public List<PassengerTicketDTO> generateTicketsByUser(String userId) {
         List<Booking> userBookings = bookingRepo.findByUser_UserID(userId);
@@ -535,7 +583,7 @@ public class UserService {
         return tickets;
     }
 
-    public List<PassengerTicketDTO> generateTicketsByUserAndBooking(String userId, Long bookingId) {
+     public List<PassengerTicketDTO> generateTicketsByUserAndBooking(String userId, Long bookingId) {
         // Get the specific booking for the user
         Optional<Booking> bookingOpt = bookingRepo.findById(bookingId);
 
@@ -759,10 +807,10 @@ public class UserService {
 
     
 	public List<Seat> getSeatsByFlightNumber(String flightNumber) {
-        log.info("Flight No---------------------->>>{}",flightNumber);
+        log.info("UserService Line no 808 | Flight No : {}",flightNumber);
 		// TODO Auto-generated method stub
         List<Seat> seats = seatRepository.findSeatsByFlightNumber(flightNumber);
-        log.info("Seats--------------------->>>{}",seats);
+//        log.info("Seats--------------------->>>{}",seats);
         
         
 //        List<Seat> allseats = seatRepository.findAllSeats();

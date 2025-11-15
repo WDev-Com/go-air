@@ -103,7 +103,7 @@ public class GlobalExceptionHandler {
         }
 
         response.put("status", "FAILED");
-        response.put("message", "Invalid request format: " + ex.getMessage());
+        response.put("message", "Invalid request format: " + "( "+ex.getMessage()+" )");
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
@@ -114,7 +114,7 @@ public class GlobalExceptionHandler {
     	
     	Map<String, Object> response = new HashMap<>();
         response.put("status", "FAILED");
-        response.put("message", "Runtime Exception : "+ex.getMessage());
+        response.put("message", "Runtime Exception : "+"( "+ex.getMessage()+" )");
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
@@ -148,7 +148,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleException(Exception ex) {
         Map<String, Object> response = new HashMap<>();
         response.put("status", "FAILED");
-        response.put("message", "Something went wrong: " + ex.getMessage());
+        response.put("message", "Something went wrong: " + "( "+ex.getMessage()+" )");
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
     }
 }
