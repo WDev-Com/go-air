@@ -67,6 +67,23 @@ public class UserService {
     
     private static final Logger log = LoggerFactory.getLogger(UserService.class);
     
+    public List<String> getAirportSuggestions(String type, String query) {
+
+        if (query == null || query.trim().isEmpty()) {
+            return List.of();
+        }
+
+        if (type.equalsIgnoreCase("source")) {
+            return flightRepository.searchSourceAirports(query);
+        } 
+        else if (type.equalsIgnoreCase("destination")) {
+            return flightRepository.searchDestinationAirports(query);
+        }
+
+        return List.of(); // invalid type
+    }
+
+    
     public Map<String, List<Flights>> searchFlightsByTripType(
             TripType tripType,
             List<String> airlines,

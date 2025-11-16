@@ -13,6 +13,21 @@ import java.util.Optional;
 @Repository
 public interface FlightRepository extends JpaRepository<Flights, Long> {
 
+	// Filter source airports by search text
+    @Query("""
+    		SELECT DISTINCT f.sourceAirport 
+            FROM Flights f 
+            WHERE LOWER(f.sourceAirport) LIKE LOWER(CONCAT(:query, '%'))""")
+    List<String> searchSourceAirports(@Param("query") String query);
+
+    // Filter destination airports by search text
+    @Query("""
+    		SELECT DISTINCT f.destinationAirport 
+            FROM Flights f 
+            WHERE LOWER(f.destinationAirport) LIKE LOWER(CONCAT(:query, '%'))""")
+    List<String> searchDestinationAirports(@Param("query") String query);
+	
+    
 	Optional<Flights> findByFlightNumber(String flightNumber);
 
 	@Query(value = """

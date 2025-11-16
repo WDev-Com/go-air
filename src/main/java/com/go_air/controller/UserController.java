@@ -37,6 +37,15 @@ public class UserController {
     
     private static final Logger log = LoggerFactory.getLogger(AdminService.class);
    
+    @GetMapping("/airport-suggestions")
+    public ResponseEntity<?> getAirportSuggestions(
+            @RequestParam String type,
+            @RequestParam String query) {
+    	log.info("query : "+query+" type : "+type);
+        return ResponseEntity.ok(userService.getAirportSuggestions(type, query));
+    }
+
+    
     @GetMapping("/flights/search")
     @ValidateFlightData
     public ResponseEntity<?> searchFlights(
